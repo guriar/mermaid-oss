@@ -1,0 +1,42 @@
+{
+  "$comment": "hello-web's harness config: everything mermaid knows about this project. See the plugin's docs/config.md.",
+  "repo": "your-github-user/hello-web",
+  "promotion_branch": "main",
+  "state_dir": ".context/harness",
+  "commands_dir": ".claude/commands",
+  "branches": {"landing": "main", "promotion_base": "main", "integration_prefix": "wave/", "studio_prefix": "studio/",
+               "deletable_prefixes": ["slice/", "hotfix/", "fix/"]},
+  "landing": {"default_mode": "pr", "branch_prefix": "hotfix/", "status_context": "Walk"},
+  "venue": {
+    "capabilities": "python tools/venue.py capabilities",
+    "up": "python tools/venue.py up --name {name} --worktree {worktree}",
+    "down": "python tools/venue.py down --name {name} {keep}",
+    "list": "python tools/venue.py list",
+    "states": "tools/venue-states.json",
+    "state_build": "python tools/venue.py state build {state} --name {name}",
+    "state_check": "python tools/venue.py state check {state} --name {name}",
+    "state_undo": "python tools/venue.py state undo {state} --name {name}",
+    "reuse": {"web/": "keep", "app/": "rebuild", "tools/": "rebuild"},
+    "ui": {"driver": {"command": "npx", "args": ["@playwright/mcp@latest"]}}
+  },
+  "gates": {
+    "commands": [{"name": "unit", "cmd": ["python", "-m", "unittest", "-q"], "at": "every-tip"}],
+    "signatures": []
+  },
+  "stops": {"extra": []},
+  "paths": {
+    "manifest_dir": "docs/manifests", "ledger_file": "docs/ledger/delivery.jsonl", "decisions_dir": "docs/decisions",
+    "design_dir": "design", "checks": "checks/", "release_doc": "docs/release.md", "slicing_doc": "docs/slicing.md",
+    "studio_doc": "docs/studio.md", "hotfix_dir": ".context/hotfix", "worktrees_dir": ".claude/worktrees", "sittings_dir": ".context/sittings", "changelog_file": "CHANGELOG.md"
+  },
+  "pictures": {"viewports": [{"name": "desktop", "width": 1280, "height": 800}, {"name": "phone", "width": 375, "height": 812}]},
+  "queue": {"labels": {"wave": "wave:", "autonomy": "autonomy:"}},
+  "ci": {"gate_check": "CI Gate", "script_prefixes": [], "watch_backoff_s": [15, 30, 60]},
+  "seats": {"build": {"runtime": "claude", "model": "opus"}, "review": {"runtime": "claude", "model": "opus"},
+            "verify": {"runtime": "claude", "model": "opus"}, "triage": {"runtime": "claude", "model": "sonnet"}},
+  "parallel": {"builder_slots": 1},
+  "watchdog": {"stale_min": 15, "ago_red_s": 90, "max_slice_wall_h": 3},
+  "review_gate": {"size_hold": {"file_lines": 400, "function_lines": 80}},
+  "dep_parity": {"venv_python": "python"},
+  "page": {"port": 4950}
+}

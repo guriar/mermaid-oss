@@ -1,0 +1,48 @@
+{
+  "$comment": "Copy to <product>/.claude/harness-config.json and fill every value. The engine carries no default for a product fact; a key it needs and does not find is a refusal naming it. docs/config.md explains each block.",
+  "repo": "<github-owner>/<repo>",
+  "promotion_branch": "main",
+  "state_dir": ".context/harness",
+  "commands_dir": ".claude/commands",
+  "branches": {"landing": "main", "promotion_base": "main", "integration_prefix": "wave/", "studio_prefix": "studio/",
+               "deletable_prefixes": ["slice/", "hotfix/", "fix/"]},
+  "landing": {"default_mode": "pr", "branch_prefix": "hotfix/", "status_context": "Walk"},
+  "venue": {
+    "capabilities": "<command printing a JSON list drawn from accounts, ui, model, states, deploy, database>",
+    "up": "<command> --name {name} --worktree {worktree}",
+    "down": "<command> --name {name} {keep}",
+    "list": "<command printing a JSON list of {name, origin, started}>",
+    "states": "<path to the states catalog>",
+    "state_build": "<command> {state} --name {name}",
+    "state_check": "<command> {state} --name {name}",
+    "state_undo": "<command> {state} --name {name}",
+    "sign_in": "<command printing {session, user}; only under accounts>",
+    "set_model": "<command> --name {name} --real {real}; only under model",
+    "say": "<command> --name {name} --text {text}; only under model",
+    "reuse": {"<path prefix>": "keep | reload | rebuild"},
+    "ui": {"driver": {"command": "npx", "args": ["@playwright/mcp@latest", "--storage-state", "{session}"]}}
+  },
+  "gates": {
+    "commands": [{"name": "unit", "cmd": ["<the test command>"], "at": "every-tip"}],
+    "preflight": "<optional command: argv and env in, adjusted argv and env or a refusal out>",
+    "signatures": [{"pattern": "<regex over a red line>", "cause": "<cause word>"}],
+    "merge_hazards": "<optional command on a composed worktree, one hazard per line>"
+  },
+  "stops": {"extra": []},
+  "paths": {
+    "manifest_dir": "docs/manifests", "ledger_file": "docs/ledger/delivery.jsonl", "decisions_dir": "docs/decisions",
+    "design_dir": "design", "checks": "checks/", "release_doc": "docs/release.md", "slicing_doc": "docs/slicing.md",
+    "studio_doc": "docs/studio.md", "hotfix_dir": ".context/hotfix", "worktrees_dir": ".claude/worktrees", "sittings_dir": ".context/sittings", "changelog_file": "CHANGELOG.md"
+  },
+  "pictures": {"viewports": [{"name": "desktop", "width": 1280, "height": 800}, {"name": "phone", "width": 375, "height": 812}]},
+  "queue": {"labels": {"wave": "wave:", "autonomy": "autonomy:"}},
+  "ci": {"gate_check": "CI Gate", "script_prefixes": [], "watch_backoff_s": [15, 30, 60]},
+  "deploy": {"version_url": "<the deployed tier's version endpoint; only under deploy>", "workflow": "<the deploy workflow name>"},
+  "seats": {"build": {"runtime": "claude", "model": "opus"}, "review": {"runtime": "claude", "model": "opus"},
+            "verify": {"runtime": "claude", "model": "opus"}, "triage": {"runtime": "claude", "model": "sonnet"}},
+  "parallel": {"builder_slots": 1},
+  "watchdog": {"stale_min": 15, "ago_red_s": 90, "max_slice_wall_h": 3},
+  "review_gate": {"size_hold": {"file_lines": 400, "function_lines": 80, "exclude_globs": []}},
+  "dep_parity": {"venv_python": "python"},
+  "page": {"port": 4950}
+}

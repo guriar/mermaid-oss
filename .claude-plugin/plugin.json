@@ -1,0 +1,9 @@
+{
+  "name": "mermaid",
+  "version": "0.1.0",
+  "description": "Mermaid: the operator. Structured product development run by an engine: a supervised hotfix lane, an unattended slice pipeline, a wave driver, a docket of causes, a promotion ceremony; installed as a plugin, the product keeps only its config, its AGENTS.md and its records.",
+  "author": {
+    "name": "guriar"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "mermaid-oss",
+  "owner": {
+    "name": "guriar"
+  },
+  "plugins": [
+    {
+      "name": "mermaid",
+      "source": "./",
+      "description": "The operator: the beats, the hb engine, the hooks, the templates and the lore."
+    }
+  ],
+  "description": "The marketplace for the mermaid plugin."
+}

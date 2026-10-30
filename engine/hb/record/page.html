@@ -1,0 +1,850 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mermaid</title>
+<style>
+/* A quiet desktop app: a translucent top bar, grouped surfaces on a grey ground, one blue.
+   The run page is three columns: the timeline rail, what is happening, and the run's record. */
+:root{
+  --bg:#f5f5f7; --surface:#ffffff; --raised:#ffffff; --ink:#1d1d1f; --soft:#5f5f64; --faint:#7c7c82; --line:#e3e3e8; --fill:#ececf0; --rail:#efeff3;
+  --blue:#0071e3; --blue-tint:#e8f1fd; --blue-line:#9cc4f3;
+  --green:#1a7f37; --green-tint:#e4f5e9; --orange:#a84f00; --orange-tint:#fff1dc; --red:#c8001a; --red-tint:#fde8ea;
+  --bar:rgb(245 245 247/.8); --shadow:0 12px 32px -12px rgb(0 0 0/.28),0 2px 6px -2px rgb(0 0 0/.12);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#000000; --surface:#1c1c1e; --raised:#2c2c2e; --ink:#f5f5f7; --soft:#a1a1a6; --faint:#8e8e93; --line:#2c2c2e; --fill:#2c2c2e; --rail:#111113;
+  --blue:#2997ff; --blue-tint:#0f2742; --blue-line:#1d5a99;
+  --green:#30d158; --green-tint:#12301b; --orange:#ff9f0a; --orange-tint:#3a2808; --red:#ff453a; --red-tint:#3b1513;
+  --bar:rgb(0 0 0/.72); --shadow:0 16px 40px -12px rgb(0 0 0/.8),0 0 0 1px rgb(255 255 255/.08); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#000000; --surface:#1c1c1e; --raised:#2c2c2e; --ink:#f5f5f7; --soft:#a1a1a6; --faint:#8e8e93; --line:#2c2c2e; --fill:#2c2c2e; --rail:#111113;
+  --blue:#2997ff; --blue-tint:#0f2742; --blue-line:#1d5a99;
+  --green:#30d158; --green-tint:#12301b; --orange:#ff9f0a; --orange-tint:#3a2808; --red:#ff453a; --red-tint:#3b1513;
+  --bar:rgb(0 0 0/.72); --shadow:0 16px 40px -12px rgb(0 0 0/.8),0 0 0 1px rgb(255 255 255/.08); color-scheme:dark}
+*{box-sizing:border-box}
+::selection{background:var(--blue-tint)}
+html{scrollbar-color:var(--fill) transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.45;letter-spacing:-.006em;-webkit-font-smoothing:antialiased}
+a{color:var(--blue);text-decoration:none;text-underline-offset:2px} a:hover{text-decoration:underline}
+button{font:inherit;color:inherit;letter-spacing:inherit}
+button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:3px solid color-mix(in srgb,var(--blue) 45%,transparent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono);font-size:12px}
+
+/* top bar */
+.top{position:sticky;top:0;z-index:20;background:var(--bar);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--line)}
+.top-in{padding:10px 24px;display:flex;align-items:center;gap:14px;min-height:48px}
+.brand{font-weight:600;font-size:15px;color:var(--ink)}
+.crumb{color:var(--soft);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crumb::before{content:"/";margin-right:14px;color:var(--faint)}
+/* the places: one segmented control, the way the time map's scale toggle is drawn */
+.places{display:inline-flex;background:var(--fill);border-radius:8px;padding:2px;gap:2px;margin-left:6px}
+.places a{border-radius:6px;padding:3px 10px;font-size:12.5px;font-weight:500;color:var(--soft)}
+.places a:hover{text-decoration:none;color:var(--ink)}
+.places a.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgb(0 0 0/.15)}
+@media (max-width:600px){.places a{padding:3px 7px;font-size:12px}}
+/* home: the machine beside the runs */
+.home-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.home-grid .panel{display:flex;flex-direction:column;gap:0}
+.q{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:8px 0;border-bottom:1px solid var(--line);align-items:start}
+.q:last-child{border-bottom:0}
+.q a{color:var(--ink)} .q a:hover{color:var(--blue)}
+.q small{grid-column:1/-1;color:var(--faint);font-size:12px}
+.lanes-bars{display:flex;flex-direction:column;gap:8px}
+.lane{display:grid;grid-template-columns:64px minmax(0,1fr) 40px;gap:10px;align-items:center;font-size:13px}
+.lane .track{height:6px;border-radius:3px;background:var(--fill);overflow:hidden}
+.lane .track i{display:block;height:100%;background:var(--blue-line);border-radius:3px}
+.lane .n{text-align:right;color:var(--soft);font-variant-numeric:tabular-nums;font-size:12.5px}
+.spacer{flex:1}
+.fresh{display:flex;align-items:center;gap:8px;color:var(--soft);font-size:12.5px;white-space:nowrap}
+.fresh i{width:7px;height:7px;border-radius:50%;background:var(--green)}
+.fresh.off i{background:var(--orange)}
+.theme{border:0;background:var(--fill);border-radius:8px;padding:5px 10px;font-size:12.5px;cursor:pointer;color:var(--soft)}
+.theme:hover{color:var(--ink)}
+
+.wrap{padding:24px 24px 80px}
+.loading{color:var(--soft)}
+
+/* run page grid */
+.run{display:grid;grid-template-columns:340px minmax(0,1fr) 380px;grid-template-areas:"head head head" "rail main side";gap:20px 24px;align-items:start}
+.r-head{grid-area:head}
+.r-rail{grid-area:rail;position:sticky;top:68px;max-height:calc(100vh - 88px);overflow:auto;scrollbar-width:thin}
+.r-main{grid-area:main;display:flex;flex-direction:column;gap:20px;min-width:0}
+.r-side{grid-area:side;display:flex;flex-direction:column;gap:20px;min-width:0}
+@media (max-width:1320px){
+  .run{grid-template-columns:320px minmax(0,1fr);grid-template-areas:"head head" "rail main" "rail side"}
+}
+@media (max-width:860px){
+  .run{grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "main" "rail" "side"}
+  .r-rail{position:static;max-height:none}
+  .wrap{padding:16px 16px 60px}
+  .top-in{padding:10px 16px}
+}
+
+/* header */
+.back{font-size:13px}
+h1{font-weight:700;font-size:26px;line-height:1.15;letter-spacing:-.022em;margin:4px 0 6px;text-wrap:balance;max-width:60ch}
+.meta{color:var(--soft);margin:0;display:flex;flex-wrap:wrap;gap:4px 14px}
+.facts{display:grid;grid-template-columns:repeat(5,minmax(0,auto));justify-content:start;gap:4px 0;margin-top:18px;background:var(--surface);border-radius:14px;padding:4px}
+.fact{padding:10px 22px 10px 16px;border-right:1px solid var(--line);min-width:0}
+.fact:last-child{border-right:0}
+.fact small{display:block;color:var(--faint);font-size:12px}
+.fact b{font-size:17px;font-weight:600;letter-spacing:-.015em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fact.v b{display:flex;align-items:center;gap:8px}
+.fact.v b::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--blue);flex:none}
+.fact.v.good b::before{background:var(--green)} .fact.v.warn b::before{background:var(--orange)} .fact.v.bad b::before{background:var(--red)}
+.fact.v span{display:block;color:var(--soft);font-size:12.5px;max-width:44ch}
+@media (max-width:860px){.facts{grid-template-columns:repeat(2,minmax(0,1fr))}.fact{border-right:0;border-bottom:1px solid var(--line)}.fact.v{grid-column:1/-1}}
+
+/* panels */
+.panel{background:var(--surface);border-radius:16px;padding:16px 18px;min-width:0}
+.panel>h2,.ph{font-size:13px;font-weight:600;color:var(--soft);margin:0 0 10px;display:flex;align-items:baseline;gap:10px}
+.ph .sub{font-weight:400;color:var(--faint)}
+.ph .grow{flex:1}
+.ph{flex-wrap:wrap}
+@media (max-width:600px){.ph .sub.hint{display:none}}
+h3{font-size:13px;font-weight:600;margin:14px 0 6px}
+h3:first-child{margin-top:0}
+p{margin:0}
+ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px} li{overflow-wrap:anywhere} li::marker{color:var(--faint)}
+.none{color:var(--soft)}
+.tag{font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 8px;white-space:nowrap;display:inline-block;line-height:1.5}
+.t-good{background:var(--green-tint);color:var(--green)} .t-warn{background:var(--orange-tint);color:var(--orange)} .t-bad{background:var(--red-tint);color:var(--red)}
+.t-run{background:var(--blue-tint);color:var(--blue)} .t-quiet{background:var(--fill);color:var(--soft)}
+
+/* the time map: every step on one clock, side by side where work ran at once */
+.map{position:relative;margin-top:6px}
+.bands{position:relative;height:22px}
+.band{position:absolute;top:0;bottom:0;border-left:1px solid var(--line);padding:0 6px;font-size:11.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.band.now{color:var(--blue);font-weight:600}
+.lanes{position:relative;border-radius:8px;background-color:var(--rail)}
+.lanes.grid{background-image:repeating-linear-gradient(90deg,transparent 0 calc(10% - 1px),var(--line) calc(10% - 1px) 10%)}
+.seg{display:inline-flex;background:var(--fill);border-radius:8px;padding:2px;gap:2px}
+.seg button{border:0;background:transparent;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:500;color:var(--soft);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgb(0 0 0/.15)}
+.bar{position:absolute;height:16px;border-radius:5px;background:var(--blue);min-width:4px;cursor:pointer;border:0;padding:0;transition:filter .15s,box-shadow .15s}
+.bar:hover{filter:brightness(1.12)}
+.bar.sel{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--blue)}
+.bar.r-checks{background:var(--blue-line)}
+.bar.red,.bar.failed{background:var(--orange)}
+.bar.cut{background:repeating-linear-gradient(135deg,var(--faint) 0 4px,transparent 4px 7px);opacity:.8}
+.bar.waiting,.bar.answered{background:repeating-linear-gradient(135deg,var(--orange) 0 4px,transparent 4px 7px)}
+.bar.running{background:linear-gradient(90deg,var(--blue),color-mix(in srgb,var(--blue) 55%,transparent))}
+.nowline{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--blue);border-radius:2px}
+.nowline::after{content:"";position:absolute;top:-3px;left:-3px;width:8px;height:8px;border-radius:50%;background:var(--blue)}
+.ticks{position:relative;height:18px;margin-top:4px}
+.ticks span{position:absolute;font-size:11px;color:var(--faint);transform:translateX(-50%);white-space:nowrap}
+.ticks span:first-child{transform:none} .ticks span:last-child{transform:translateX(-100%)}
+
+/* the rail: the run's line, top to bottom */
+.rail{background:var(--surface);border-radius:16px;padding:14px 10px 14px 12px}
+.rail-h{display:flex;align-items:baseline;gap:8px;padding:0 6px 8px}
+.rail-h b{font-size:13px;font-weight:600;color:var(--soft)}
+.rail-h span{margin-left:auto;font-size:12px;color:var(--faint)}
+.stn{position:relative;padding-left:22px}
+.stn::before{content:"";position:absolute;left:9px;top:0;bottom:0;width:2px;background:var(--fill)}
+.stn.done::before{background:var(--blue)}
+.stn.now::before{background:linear-gradient(var(--blue) 0 50%,var(--fill) 50%)}
+.stn:last-child::before{bottom:calc(100% - 14px)}
+.stn:first-child::before{top:14px}
+.stn-h{display:flex;align-items:baseline;gap:8px;padding:6px 6px 6px 4px;position:relative}
+.stn-h::before{content:"";position:absolute;left:-18px;top:9px;width:10px;height:10px;border-radius:50%;background:var(--surface);border:2px solid var(--fill)}
+.stn.done .stn-h::before{background:var(--blue);border-color:var(--blue)}
+.stn.now .stn-h::before{border-color:var(--blue);background:var(--surface)}
+.stn.halt .stn-h::before{border-color:var(--orange)}
+.stn-h b{font-size:13.5px;font-weight:600}
+.stn.todo .stn-h b{color:var(--faint);font-weight:500}
+.stn-h span{margin-left:auto;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+.stn.now .stn-h span{color:var(--blue)}
+.steps{display:flex;flex-direction:column;gap:2px;padding-bottom:6px}
+.step{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:2px 8px;align-items:start;text-align:left;width:100%;background:transparent;border:0;border-radius:10px;padding:7px 8px 7px 6px;cursor:pointer;position:relative}
+.step:hover{background:var(--fill)}
+.step[aria-pressed="true"]{background:var(--blue-tint)}
+.step .dot{width:8px;height:8px;border-radius:50%;margin-top:6px;background:var(--blue);justify-self:center}
+.step.r-checks .dot{background:var(--surface);border:2px solid var(--blue)}
+.step.s-red .dot,.step.s-failed .dot{background:var(--orange);border-color:var(--orange)}
+.step.s-cut .dot{background:var(--faint)}
+.step.s-waiting .dot{background:var(--orange)}
+.step.s-running .dot{position:relative}
+.step.par{margin-left:14px;width:calc(100% - 14px)}
+.step.par::before{content:"";position:absolute;left:-9px;top:-2px;width:8px;height:14px;border-left:2px solid var(--fill);border-bottom:2px solid var(--fill);border-bottom-left-radius:6px}
+.step .nm{font-weight:600;font-size:13.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.step .sm{grid-column:2/4;color:var(--soft);font-size:12.5px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.step .mt{font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums;white-space:nowrap;padding-top:1px}
+.step.s-running .mt{color:var(--blue);font-weight:600}
+.step .len{grid-column:2/4;height:3px;border-radius:2px;background:var(--fill);margin-top:4px;overflow:hidden}
+.step .len i{display:block;height:100%;background:var(--blue-line);border-radius:2px}
+.step.s-running .len i{background:var(--blue)}
+.gap{color:var(--faint);font-size:12px;padding:2px 8px 6px 26px}
+@media (prefers-reduced-motion:no-preference){
+  .step.s-running .dot::after,.stn.now .stn-h::after{content:"";position:absolute;border-radius:50%;background:var(--blue);animation:breathe 2.2s cubic-bezier(.16,1,.3,1) infinite}
+  .step.s-running .dot::after{inset:0}
+  .stn.now .stn-h::after{left:-15px;top:12px;width:8px;height:8px}
+  .bar.running{animation:glow 2.2s ease-in-out infinite}
+}
+@keyframes breathe{0%{transform:scale(1);opacity:.45}70%,100%{transform:scale(3);opacity:0}}
+@keyframes glow{50%{filter:brightness(1.25)}}
+
+/* selected step */
+.detail-h{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-bottom:4px}
+.detail-h h2{font-size:19px;font-weight:600;letter-spacing:-.018em;margin:0}
+.kv{display:flex;flex-wrap:wrap;gap:4px 18px;color:var(--soft);font-size:13px;margin:0 0 14px;font-variant-numeric:tabular-nums}
+.kv b{color:var(--ink);font-weight:500}
+.lead{font-size:15px;line-height:1.5;max-width:75ch;margin-bottom:12px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{font-weight:500;color:var(--faint);text-align:left;font-size:12px;padding:8px 12px 6px 0;border-bottom:1px solid var(--line)}
+td{overflow-wrap:anywhere;padding:9px 12px 9px 0;border-bottom:1px solid var(--line);vertical-align:top;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0} td:last-child,th:last-child{padding-right:0}
+td.n{white-space:nowrap;color:var(--soft)} td.mono{white-space:nowrap}
+.tbl{overflow-x:auto}
+.cols+.cols{margin-top:16px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px 28px}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.btn{display:inline-flex;align-items:center;gap:6px;font:600 13.5px var(--font);color:#fff;background:var(--blue);border:0;border-radius:999px;padding:7px 16px;cursor:pointer;text-decoration:none}
+.btn:hover{text-decoration:none;filter:brightness(1.08)}
+.btn:disabled{opacity:.5;cursor:default}
+.more{font-size:12.5px;color:var(--faint);margin-top:8px}
+
+/* working now */
+.seats{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.seat{background:var(--surface);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0;border:0;text-align:left;cursor:pointer}
+.seat:hover{box-shadow:inset 0 0 0 1px var(--line)}
+.seat.sel{box-shadow:inset 0 0 0 2px var(--blue)}
+.seat-h{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.seat-h b{font-weight:600;font-size:14px}
+.seat-h span{color:var(--soft);font-size:12.5px;font-variant-numeric:tabular-nums}
+.livedot{width:8px;height:8px;border-radius:50%;background:var(--blue);position:relative;flex:none}
+@media (prefers-reduced-motion:no-preference){.livedot::after{content:"";position:absolute;inset:0;border-radius:50%;background:var(--blue);animation:breathe 2.2s cubic-bezier(.16,1,.3,1) infinite}}
+.doing{list-style:none;padding:0;gap:4px}
+.doing li,.feed li{display:grid;grid-template-columns:4.6em minmax(0,1fr);gap:10px;font-size:13.5px;overflow-wrap:anywhere}
+.doing li:first-child{color:var(--ink);font-weight:500}
+.doing li:not(:first-child){color:var(--soft)}
+.when{color:var(--faint);font-size:12px;font-variant-numeric:tabular-nums;padding-top:1px}
+
+/* the record */
+.feed{list-style:none;padding:0;gap:7px;max-height:420px;overflow-y:auto;scrollbar-width:thin}
+.feed li span:last-child{color:var(--soft)}
+.feed li:first-child span:last-child{color:var(--ink)}
+.items .grp{font-size:12px;font-weight:600;color:var(--faint);margin:12px 0 2px}
+.items .grp:first-child{margin-top:0}
+.it{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.it:last-child{border-bottom:0}
+.it .mono{color:var(--soft)}
+.it p{grid-column:1/-1;font-size:13px;color:var(--ink);line-height:1.4}
+.it small{grid-column:1/-1;color:var(--faint);font-size:12px}
+.counts{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+dl.list{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:7px 18px;margin:0}
+dl.list dt{color:var(--soft)} dl.list dd{margin:0;font-variant-numeric:tabular-nums}
+
+/* the question */
+.ask{background:var(--surface);border-radius:18px;padding:20px 22px;display:flex;flex-direction:column;gap:12px;box-shadow:inset 0 0 0 2px var(--orange)}
+.ask h2{font-weight:600;font-size:19px;line-height:1.25;letter-spacing:-.018em;margin:0;text-wrap:balance}
+textarea{font:inherit;letter-spacing:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;min-height:52px;caret-color:var(--blue)}
+.shots{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.shots figure{margin:0;font-size:12.5px;color:var(--soft);display:flex;flex-direction:column;gap:6px}
+.shots img{width:100%;border-radius:10px;border:1px solid var(--line);display:block;cursor:zoom-in}
+.shots img:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+/* a picture opened full size: click, Escape or the close button shuts it, arrows walk the run's pictures */
+.zoom{position:fixed;inset:0;z-index:60;background:rgb(0 0 0/.86);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;cursor:zoom-out}
+.zoom[hidden]{display:none}
+.zoom img{max-width:100%;max-height:calc(100vh - 90px);object-fit:contain;border-radius:8px;background:#fff}
+.zoom.actual img{max-width:none;max-height:none;cursor:zoom-out}
+.zoom.actual{overflow:auto;justify-content:flex-start;align-items:flex-start}
+.zoom p{margin:0;color:#f5f5f7;font-size:13.5px;display:flex;gap:14px;align-items:center}
+.zoom button{font:inherit;color:#f5f5f7;background:rgb(255 255 255/.14);border:0;border-radius:8px;padding:5px 10px;cursor:pointer}
+.film video{width:100%;max-height:70vh;border-radius:12px;background:#000;display:block}
+.film .text{white-space:pre-wrap;font-size:13.5px;line-height:1.55;color:var(--soft);margin:12px 0 0}
+.film details{margin-top:10px}.film summary{cursor:pointer;font-size:13.5px}
+
+/* hover card */
+.pop{position:fixed;z-index:50;width:340px;max-width:calc(100vw - 24px);background:var(--raised);color:var(--ink);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;pointer-events:none;opacity:0;transform:translateY(4px);transition:opacity .14s ease-out,transform .14s ease-out}
+.pop.on{opacity:1;transform:none}
+.pop h4{margin:0;font-size:14.5px;font-weight:600;display:flex;align-items:center;gap:8px}
+.pop .kv{margin:6px 0 8px;font-size:12.5px}
+.pop p{font-size:13px;color:var(--soft)}
+.pop ul{font-size:12.5px;margin-top:8px;gap:4px;color:var(--ink)}
+.pop .hint{margin-top:10px;font-size:11.5px;color:var(--faint)}
+
+/* board */
+.board,.home{display:flex;flex-direction:column;gap:20px}
+.home>div:empty{display:none}
+.board table{min-width:640px}
+.verdict{background:var(--surface);border-radius:16px;padding:16px 20px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 14px;align-items:center}
+.verdict::before{content:"";grid-row:1/3;width:12px;height:12px;border-radius:50%;background:var(--blue)}
+.verdict b{font-size:18px;font-weight:600}
+.verdict span{grid-column:2;color:var(--soft)}
+.v-good::before{background:var(--green)} .v-warn::before{background:var(--orange)} .v-bad::before{background:var(--red)}
+tr.go{cursor:pointer} tr.go:hover td{background:var(--fill)}
+
+/* home: every live run in full, then what finished */
+.lr{display:flex;flex-direction:column;gap:14px;padding:18px 20px}
+.lr-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lr-h a{font-size:18px;font-weight:600;letter-spacing:-.016em;color:var(--ink);min-width:0}
+.lr-h a:hover{color:var(--blue);text-decoration:none}
+.lr-h .spacer{flex:1}
+.lr-h a.theme{font-size:12.5px;font-weight:500;color:var(--soft);letter-spacing:0}
+.lr .meta b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+.lr-cols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px 28px}
+.lr-seat{padding:8px 0;border-bottom:1px solid var(--line)}
+.lr-seat:last-child{border-bottom:0}
+.lr-seat .seat-h{margin-bottom:4px}
+.lr .feed{max-height:260px}
+.home-h{display:flex;align-items:baseline;gap:12px;margin:4px 0 -6px}
+.home-h h2{font-size:15px;font-weight:600;margin:0}
+.home-h span{color:var(--faint);font-size:13px}
+@media (max-width:860px){.lr-cols{grid-template-columns:minmax(0,1fr)}}
+/* running now: one tab per live run, the way a segmented control is drawn */
+.sec-h{display:flex;align-items:baseline;gap:10px;margin:0 0 10px}
+.sec-h h2{font-size:15px;font-weight:600;margin:0}
+.sec-h span{color:var(--faint);font-size:13px;font-variant-numeric:tabular-nums}
+.tabs{display:flex;gap:2px;overflow-x:auto;background:var(--fill);border-radius:10px;padding:3px;scrollbar-width:none}
+.tab{border:0;background:transparent;border-radius:8px;padding:7px 14px;display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--soft);white-space:nowrap;min-width:0;max-width:420px;font-size:13px}
+.tab b{font-weight:500;overflow:hidden;text-overflow:ellipsis}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgb(0 0 0/.15)}
+.tab .t-sub{color:var(--faint);font-variant-numeric:tabular-nums}
+.tabpanel{margin-top:14px}
+.waiting{display:flex;flex-direction:column;gap:10px}
+.waiting .from{font-size:13px;color:var(--soft)}
+.meters{display:flex;align-items:center;gap:16px;color:var(--soft);font-size:12.5px;white-space:nowrap}
+.meters .m small{color:var(--faint);font-size:12px;margin-right:6px}
+.meters b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums;margin-right:4px}
+@media (max-width:1180px){.meters .wk{display:none}}
+@media (max-width:820px){.meters{display:none}}
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in"><a class="brand" href="#">Mermaid</a><nav class="places" id="places"><a href="#" data-place="home">Home</a><a href="#runs" data-place="runs">Runs</a><a href="#queue" data-place="queue">Queue</a><a href="#venues" data-place="venues">Venues</a><a href="#docket" data-place="docket">Docket</a></nav><span class="crumb" id="crumb" hidden></span><span class="spacer"></span>
+  <span class="meters" id="meters"></span><span class="fresh" id="fresh"><i></i><span>Reading</span></span><button class="theme" id="theme" type="button" title="Switch between automatic, light and dark">Auto</button></div></header>
+<div class="wrap"><main id="main"><p class="loading">Reading the runs…</p></main></div>
+<div class="pop" id="pop" role="tooltip"></div>
+<div class="zoom" id="zoom" hidden role="dialog" aria-modal="true" aria-label="Picture, full size"><img alt=""><p><span class="cap"></span><span class="n"></span><button type="button" data-z="actual">Actual size</button><button type="button" data-z="close">Close</button></p></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const short=(s,n=96)=>{s=String(s||"");return s.length>n?s.slice(0,n).replace(/\s+\S*$/,"")+"…":s};
+const ms=ts=>ts?Date.parse(ts):NaN;
+const clock=ts=>ts?new Date(ts).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}):"";
+const day=ts=>ts?new Date(ts).toLocaleDateString([],{month:"short",day:"numeric"}):"";
+const localTimes=s=>String(s).replace(/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z/g,t=>`${day(t)} ${clock(t)}`);
+const dur=m=>m==null?"":m===0?"0m":m<1?`${Math.max(1,Math.round(m*60))}s`:m<60?`${Math.round(m)}m`:`${Math.floor(m/60)}h ${String(Math.round(m%60)).padStart(2,"0")}m`;
+const secs=s=>s==null?"":s<60?`${Math.floor(s)}s`:s<3600?`${Math.floor(s/60)}m ${String(Math.floor(s%60)).padStart(2,"0")}s`:`${Math.floor(s/3600)}h ${String(Math.floor(s%3600/60)).padStart(2,"0")}m`;
+const usd=x=>x==null?"":x<10?`$${x.toFixed(2)}`:`$${Math.round(x).toLocaleString()}`;
+const toks=n=>n==null?"":n>=1e6?`${(n/1e6).toFixed(1)}M tokens`:n>=1000?`${Math.round(n/1000)}k tokens`:`${n} tokens`;
+const list=(rows,empty="Nothing.")=>rows&&rows.length?`<ul>${rows.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:`<p class="none">${esc(empty)}</p>`;
+const panel=(title,inner,sub="")=>`<section class="panel"><h2 class="ph">${esc(title)}${sub?`<span class="sub">${sub}</span>`:""}</h2>${inner}</section>`;
+async function api(path,body){const r=await fetch(path,body?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:undefined);return r.json()}
+
+const KIND={hotfix:"Hotfix",slice:"Slice",wave:"Wave"};
+const ITEM={WORKS:["t-good","works"],BROKEN:["t-bad","broken"],DIVERGED:["t-bad","differs"],UNMEASURED:["t-warn","not measured"],"":["t-quiet","waiting"]};
+/* the journal's one list of run states (journal.STATE_LABELS), put in by the server */
+const RUN=/*RUN_STATES*/{};
+const STEP={ok:["t-good","done"],handed:["t-quiet","handed over"],running:["t-run","working"],red:["t-warn","red"],failed:["t-bad","did not finish"],cut:["t-quiet","cut short"],waiting:["t-warn","waiting on you"],answered:["t-quiet","answered"]};
+const untested=v=>(v.items||[]).length?v.items.every(r=>!r.state):true;
+/* a builder past its first attempt took over from the one before; a reviewer or fixer runs a round */
+const attemptTag=s=>s.attempt>1?` <span class="tag t-quiet">${s.role==="build"?"took over":`${s.role==="review"||s.role==="fix"?"round":"try"} ${s.attempt}`}</span>`:"";
+/* nothing is tested until the audit drives it: zero then means untested, not broken */
+const worksWords=(w,t,untested)=>!t?"":untested&&!w?`${t} item${t===1?"":"s"}, not tested yet`:`${w} of ${t} work`;
+const tag=(map,k)=>{const [c,t]=map[k]||["t-quiet",k||""];return `<span class="tag ${c}">${esc(t)}</span>`};
+
+/* the clock: the server's time when the page last read, moved forward every second here */
+let serverNow=Date.now()/1000, readAt=Date.now(), okAt=0;
+const nowS=()=>serverNow+(Date.now()-readAt)/1000;
+function tick(){
+  document.querySelectorAll("[data-since]").forEach(e=>{const t=ms(e.dataset.since)/1000; if(t) e.textContent=secs(Math.max(0,nowS()-t))});
+  document.querySelectorAll("[data-base]").forEach(e=>{e.textContent=secs(+e.dataset.base+(Date.now()-readAt)/1000)});
+  const f=$("#fresh"), up=typeof es!=="undefined"&&es&&es.readyState===1; f.querySelector("span").textContent=up?"Live":okAt?"Reconnecting":"Reading"; f.classList.toggle("off",!up)
+}
+setInterval(tick,1000);
+
+/* theme: automatic, light or dark, remembered on this machine */
+const THEMES=["auto","light","dark"];
+function setTheme(t){if(t==="auto")document.documentElement.removeAttribute("data-theme");else document.documentElement.dataset.theme=t; $("#theme").textContent=t[0].toUpperCase()+t.slice(1)}
+let theme="auto"; try{theme=localStorage.getItem("harness-theme")||"auto"}catch(e){}
+setTheme(theme);
+$("#theme").addEventListener("click",()=>{theme=THEMES[(THEMES.indexOf(theme)+1)%3]; setTheme(theme); try{localStorage.setItem("harness-theme",theme)}catch(e){}});
+
+/* ---------- home: the runs working now, one tab each, then what finished ---------- */
+function liveCard(v){
+  const meta=[KIND[v.kind]||esc(v.kind),`At ${esc(v.where||"")}`,`<span>elapsed <b data-since="${esc(v.started)}">${secs(nowS()-ms(v.started)/1000)}</b></span>`,
+    worksWords(v.works,v.total,untested(v)),v.pr?`<a href="${esc(v.pr)}">Open the PR</a>`:""].filter(Boolean).map(x=>`<span>${x}</span>`).join("");
+  const seats=(v.seats||[]).map(p=>`<div class="lr-seat"><div class="seat-h"><span class="livedot"></span><b>${esc(p.role)}</b><span data-since="${esc(p.since)}">${secs(p.running_s)}</span>${p.quiet_s>=600?`<span class="tag t-warn">quiet ${secs(p.quiet_s)}</span>`:""}</div>
+    ${p.doing&&p.doing.length?`<ul class="doing">${p.doing.slice(0,5).map(d=>`<li><span class="when">${clock(d.at)}</span><span>${esc(d.text)}</span></li>`).join("")}</ul>`:`<p class="none">Starting up.</p>`}</div>`).join("");
+  const feed=(v.activity||[]).slice(0,12), decided=v.decided||[];
+  return `<section class="panel lr" data-run="${esc(v.id)}"><div class="lr-h"><a href="#run/${esc(v.id)}">${esc(short(v.title,140))}</a><span class="spacer"></span><a class="theme" href="#run/${esc(v.id)}">Open the run</a></div>
+    <p class="meta">${meta}</p>
+    <div class="lr-cols"><div><h3>Working now</h3>${seats||`<p class="none">Between seats.</p>`}</div>
+      <div><h3>Latest</h3>${feed.length?`<ul class="feed">${feed.map(r=>`<li><span class="when">${clock(r.at)}</span><span>${esc(r.text)}</span></li>`).join("")}</ul>`:`<p class="none">Nothing yet.</p>`}</div></div>
+    ${decided.length?`<div><h3>Decided for you</h3>${list(decided)}</div>`:""}</section>`;
+}
+/* a standing run is live: its PR is open and it waits on the chat or the merge */
+const running=h=>(h.live||[]).filter(v=>v.state==="running"||v.state==="standing");
+const asking=h=>(h.live||[]).filter(v=>v.stops&&v.stops.length);
+let selTab=null;
+function tabRun(h){const r=running(h); return r.find(v=>v.id===selTab)||r[0]||null}
+function waitHtml(h){
+  const a=asking(h); if(!a.length) return "";
+  return `<section class="waiting"><div class="sec-h"><h2>Waiting on you</h2><span>${a.reduce((n,v)=>n+v.stops.length,0)}</span></div>
+    ${a.map(v=>`<p class="from"><a href="#run/${esc(v.id)}">${esc(short(v.title,120))}</a> · ${v.state==="standing"?"standing, a step stopped":"stopped at "+esc(v.where||"")}</p>${asksHtml(v)}`).join("")}</section>`;
+}
+function tabsHtml(h){
+  const r=running(h), sel=tabRun(h);
+  if(!r.length) return `<div class="sec-h"><h2>Running now</h2></div><p class="none">Nothing is running. A run launched from any chat shows here the moment it starts.</p>`;
+  return `<div class="sec-h"><h2>Running now</h2><span>${r.length}</span></div><div class="tabs" role="tablist" aria-label="Running now">${r.map(v=>`<button class="tab" role="tab" type="button" data-tab="${esc(v.id)}" aria-selected="${sel&&sel.id===v.id}" tabindex="${sel&&sel.id===v.id?0:-1}">
+    <span class="livedot"></span><b>${esc(short(v.title,56))}</b><span class="t-sub" data-since="${esc(v.started)}">${secs(nowS()-ms(v.started)/1000)}</span></button>`).join("")}</div>`;
+}
+function tabPanelHtml(h){const v=tabRun(h); return v?`<div class="tabpanel" role="tabpanel">${liveCard(v)}</div>`:""}
+function finishedTable(rows){
+  const tr=rows.map(r=>`<tr class="go" data-go="${esc(r.id)}"><td><a href="#run/${esc(r.id)}">${esc(short(r.title,110))}</a></td><td>${KIND[r.kind]||esc(r.kind)}</td><td>${tag(RUN,r.state)}</td>
+    <td class="n">${r.total?`${r.works} of ${r.total}`:""}</td><td>${r.shipped?`<span class="tag t-good">Shipped</span>`:""}${r.film?` <span class="tag t-quiet">Film</span>`:""}</td><td class="n">${day(r.started)}</td><td class="n">${dur(r.cost.wall_min)}</td><td class="n">${r.pr?`<a href="${esc(r.pr)}">PR</a>`:""}</td></tr>`).join("");
+  return tr?`<section class="panel tbl"><table><tr><th>Run</th><th>Kind</th><th>Verdict</th><th>Items</th><th>Review</th><th>Started</th><th>Time</th><th></th></tr>${tr}</table></section>`:`<p class="none">Nothing finished lately.</p>`;
+}
+const HOME_REGIONS={wait:waitHtml,tabs:tabsHtml,panel:tabPanelHtml,
+  fin:h=>`<div class="sec-h"><h2>${place()==="runs"?"Finished":"Finished lately"}</h2></div>${finishedTable((h.finished||[]).slice(0,place()==="runs"?60:12))}`};
+function homeShell(){return `<div class="home">${Object.keys(HOME_REGIONS).map(k=>`<div data-h="${k}"></div>`).join("")}</div>`}
+/* the header's meters: what the seats spent today and over seven days, and a limit only while it holds */
+function metersHtml(h){
+  const u=h&&h.usage; if(!u) return "";
+  const span=(name,x)=>`<span class="m"><small>${name}</small><b>${dur(x.agent_min)}</b> <b>${usd(x.list_usd)}</b>${x.codex_tokens?` <b>${toks(x.codex_tokens).replace(" tokens","")}</b> Codex`:""}</span>`;
+  const lim=u.limit?`<span class="tag t-warn" title="A seat hit the plan's ${esc(u.limit.kind||"")} limit at ${esc(clock(u.limit.at))}">Limit hit, resets ${esc(day(u.limit.resets*1000))} ${esc(clock(u.limit.resets*1000))}</span>`:"";
+  return `${lim}${span("Today",u.today)}<span class="wk">${span("7 days",u.week)}</span>`;
+}
+/* the queue: what GitHub holds for the doors */
+const LANE={ready:["t-good","ready"],queued:["t-run","queued"],held:["t-quiet","held"]};
+const ago=x=>x&&x.age_s!=null?`read ${secs(x.age_s)} ago`:"";
+function queueRows(q){
+  if(!q.lanes) return `<p class="none">${q.reading?"Reading GitHub.":"GitHub did not answer."}</p>`;
+  const rows=[...q.lanes.ready.map(r=>({...r,lane:"ready"})),...q.lanes.queued.map(r=>({...r,lane:"queued"})),...q.lanes.held.map(r=>({...r,lane:"held"}))];
+  if(!rows.length) return `<p class="none">${q.unread.length?"GitHub did not answer.":"Nothing is queued."}</p>`;
+  return rows.map(r=>`<div class="q"><span><a href="https://github.com/${esc(REPO)}/issues/${r.number}">${r.anchor?"Wave ":""}#${r.number} ${esc(short(r.title,70))}</a></span>${tag(LANE,r.lane)}${r.wave&&!r.anchor?`<small>in the ${esc(r.wave)} wave</small>`:""}</div>`).join("");
+}
+/* the venues standing right now, and what they hold */
+function venuesRows(s){
+  if(!s.venues) return `<p class="none">${s.reading?"Reading the venues.":"The venue did not answer."}</p>`;
+  if(!s.venues.length) return `<p class="none">${s.undeclared?"The product declares no venue.":"No venue is standing."}</p>`;
+  return s.venues.map(x=>`<div class="q"><span><b>${esc(x.venue)}</b>${x.issue?` <span class="none">for #${esc(x.issue)}</span>`:""}</span>${x.state==="up"?`<span class="tag t-run">up</span>`:`<span class="tag t-warn">${esc(x.state)}</span>`}
+    <small>${x.origin?`<a href="${esc(x.origin)}">${esc(x.origin)}</a> · `:""}${x.model==="real"?"real model":"mock model"}${x.mem_mib!=null?` · ${x.mem_mib>=1024?(x.mem_mib/1024).toFixed(1)+" GB":x.mem_mib+" MB"}`:" · memory not given"} · up <span data-since="${esc(x.created)}">${secs(nowS()-ms(x.created)/1000)}</span></small></div>`).join("");
+}
+function venuesPanel(s){
+  const mem=s.mem_mib!=null?`${(s.mem_mib/1024).toFixed(1)} GB held`:"";
+  return panel("Venues",venuesRows(s),[s.venues?`${s.venues.length} standing`:"",mem,ago(s)].filter(Boolean).join(" · "));
+}
+/* the docket, open by lane */
+function docketPanel(d){
+  const lanes=Object.entries(d.open||{}); if(!lanes.length) return panel("Docket",`<p class="none">${d.reading?"Reading the docket.":d.unread?"The docket could not be read.":"Nothing open."}</p>`);
+  const max=Math.max(...lanes.map(([,n])=>n));
+  return panel("Docket",`<div class="lanes-bars">${lanes.map(([k,n])=>`<div class="lane"><span>${esc(k)}</span><span class="track"><i style="width:${Math.max(3,n/max*100)}%"></i></span><span class="n">${n}</span></div>`).join("")}</div>
+    <p class="more">Rig items are fixed in the session; the other lanes wait for your walk.</p>`,`${d.total} open`);
+}
+/* the rig, the landing branch's gate, the deployed tier */
+function healthPanel(hl){
+  const r=hl.rig||{}, g=hl.landing||{}, dep=hl.deployed||{};
+  if(hl.reading) return panel("Health",`<p class="none">Reading.</p>`);
+  const gate=g.unread?`<span class="tag t-warn">not read</span>`:g.gate==="success"?`<span class="tag t-good">green</span>`:g.gate?`<span class="tag t-bad">${esc(g.gate)}</span>`:`<span class="tag t-quiet">no gate yet</span>`;
+  return panel("Health",`<dl class="list"><dt>Rig</dt><dd>${r.commit?`${esc(r.commit)}${r.drills_green?", drills green":""}`:"not read"}</dd>
+    <dt>${esc(g.branch||"Landing branch")}</dt><dd>${gate}${g.sha?` <span class="mono">${esc(g.sha)}</span>`:""}</dd>
+    <dt>Deployed</dt><dd>${dep.sha?`<span class="mono">${esc(dep.sha)}</span>${g.sha&&dep.sha&&!g.sha.startsWith(dep.sha)&&!dep.sha.startsWith(g.sha)?` <span class="tag t-warn">behind ${esc(g.branch||"the landing branch")}</span>`:""}`:`not read${dep.unread?": "+esc(dep.unread):""}`}</dd></dl>`,ago(hl));
+}
+let REPO="";
+function queuePage(h){
+  const q=h.queue||{reading:true}, c=q.counts;
+  return `<div class="board">${panel("Queue",queueRows(q),[c?`${c.ready} ready · ${c.queued} queued · ${c.held} held`:"",ago(q)].filter(Boolean).join(" · "))}</div>`;
+}
+function venuesPage(h){return `<div class="board">${venuesPanel(h.venues||{reading:true})}${healthPanel(h.health||{reading:true})}</div>`}
+function docketPage(h){return `<div class="board">${docketPanel(h.docket||{reading:true})}</div>`}
+
+/* ---------- the run ---------- */
+let V=null, picked={}, popFor=null;
+const live=v=>v.state==="running";
+function current(v){
+  const s=v.steps||[];
+  return [...s].reverse().find(x=>x.state==="running"||x.state==="waiting")||s.find(x=>x.kind==="pr")||s[s.length-1]||null;
+}
+function selected(v){const id=picked[v.id]; return (v.steps||[]).find(s=>s.id===id)||current(v)}
+
+function verdict(v){
+  if(v.closeout) return ["good","Done and clean",v.closeout.summary||"Merged, and nothing left behind."];
+  if(v.limit) return ["warn","Paused",`paused: usage limit, resets ${v.limit}. Resume the run once the plan is back.`];
+  if(v.stops.length||v.needs) return ["warn","Waiting on you",v.stops.length?"Answer below and the run picks up where it stopped.":"A slice is stopped on a question. The others keep going."];
+  if(v.state==="ended") return ["warn","Ended","Its process is gone; it did not reach the end of its line."];
+  if(v.state==="standing") return ["","Standing","PR open, waiting for the chat or the merge."];
+  if(v.state==="stopped"||v.state==="paused") return ["warn",v.state==="paused"?"Held":"Stopped",`At ${v.where}.`];
+  if(v.first_screen){const f=v.first_screen; return [{"Ready":"good","Known reds":"warn","Not ready":"bad"}[f.verdict]||"",f.verdict,f.summary+(f.why?`. ${f.why}`:"")]}
+  return ["","Nothing needs you",`At ${v.where}.`];
+}
+
+/* agent work counts the seats still working, which the journal only totals when they end */
+function agentFact(v){
+  const working=(v.steps||[]).filter(s=>s.state==="running"&&s.kind==="seat").reduce((a,s)=>a+nowS()-ms(s.start)/1000,0);
+  if(!working) return `<b>${v.cost.agent_min?dur(v.cost.agent_min):"none yet"}</b>`;
+  return `<b class="num" data-base="${Math.round(v.cost.agent_min*60+working)}">${secs(v.cost.agent_min*60+working)}</b>`;
+}
+function headHtml(v){
+  const [c,word,why]=verdict(v), c0=v.cost;
+  const meta=[KIND[v.kind]||v.kind, v.wave?`in the ${esc(v.wave)} wave`:"", `started ${day(v.started)}, ${clock(v.started)}`, v.issue?esc(v.issue):"",
+    v.pr?`<a href="${esc(v.pr)}">Open the PR</a>`:""].filter(Boolean).map(x=>`<span>${x}</span>`).join("");
+  const clockFact=live(v)?`<b class="num" data-base="${c0.wall_min*60}">${secs(c0.wall_min*60)}</b>`:`<b>${dur(c0.wall_min)}</b>`;
+  return `<a class="back" href="#">Back to every run</a><h1>${esc(short(v.title,160))}</h1><p class="meta">${meta}</p>
+    <div class="facts"><div class="fact v ${c}"><small>Status</small><b>${esc(word)}</b><span>${esc(why)}</span></div>
+      <div class="fact"><small>${live(v)?"Start to now":"Start to finish"}</small>${clockFact}</div>
+      <div class="fact"><small>Agent work</small>${agentFact(v)}</div>
+      <div class="fact"><small>Allowance used</small><b>${c0.list_usd?usd(c0.list_usd):live(v)?"$0 so far":"$0"}</b></div>
+      <div class="fact"><small>Items working</small><b>${v.total?worksWords(v.works,v.total,untested(v)):"none yet"}</b></div></div>`;
+}
+
+/* the time map. "Readable" gives each stretch of time a length that grows as the root of its duration, so a
+   three-hour build and a two-minute fix both stay visible in order; "To scale" is the wall clock. */
+let scale="readable"; try{scale=localStorage.getItem("harness-scale")||"readable"}catch(e){}
+function warp(st,t0,t1,endOf){
+  if(scale==="clock") return t=>Math.max(0,Math.min(100,(t-t0)/Math.max(60000,t1-t0)*100));
+  const pts=[...new Set([t0,t1,...st.flatMap(s=>[ms(s.start),endOf(s)])])].filter(t=>t>=t0&&t<=t1).sort((a,b)=>a-b);
+  const w=pts.slice(1).map((t,i)=>t>pts[i]?Math.sqrt((t-pts[i])/60000)+.2:0), cum=[0];
+  w.forEach(x=>cum.push(cum[cum.length-1]+x)); const total=cum[cum.length-1]||1;
+  return t=>{if(t<=t0) return 0; if(t>=t1) return 100;
+    let i=0; while(i<pts.length-2&&pts[i+1]<t) i++;
+    const f=pts[i+1]>pts[i]?(t-pts[i])/(pts[i+1]-pts[i]):0; return (cum[i]+w[i]*f)/total*100};
+}
+function mapHtml(v){
+  const st=(v.steps||[]).filter(s=>s.start); if(!st.length) return "";
+  const t0=Math.min(ms(v.started),...st.map(s=>ms(s.start))), endOf=s=>s.end?ms(s.end):nowS()*1000;
+  const t1=live(v)?Math.max(nowS()*1000,...st.map(endOf)):Math.max(...st.map(endOf),ms(v.last));
+  const x=warp(st,t0,t1,endOf);
+  const lanes=Math.max(1,...st.map(s=>(s.lane||0)+1)), H=22;
+  const sel=selected(v), at=Math.floor(v.at);
+  const first={}; st.forEach(s=>{if(!(s.station in first)||ms(s.start)<first[s.station]) first[s.station]=ms(s.start)});
+  const order=Object.keys(first).map(Number).sort((a,b)=>first[a]-first[b]);
+  const bands=order.map((k,i)=>{const a=x(first[k]), b=i+1<order.length?x(first[order[i+1]]):100;
+    return `<span class="band${k===at&&live(v)?" now":""}" style="left:${a}%;width:${Math.max(0,b-a)}%" title="${esc(v.line[k]||"")}">${b-a>7?esc(v.line[k]||""):""}</span>`}).join("");
+  const bars=st.map(s=>{const a=x(ms(s.start)), b=x(endOf(s));
+    return `<button class="bar r-${esc(s.role)} ${esc(s.state)}${sel&&sel.id===s.id?" sel":""}" data-step="${esc(s.id)}" style="left:${a}%;width:${Math.max(0,b-a)}%;top:${3+(s.lane||0)*H}px" aria-label="${esc(s.name)}"></button>`}).join("");
+  const nowLine=live(v)?`<span class="nowline" style="left:calc(${x(nowS()*1000)}% - 1px)"></span>`:"";
+  let ticks=[];
+  if(scale==="clock"){const span=t1-t0, step=[5,10,15,30,60,120,180,240,360,720].find(m=>span/60000/m<=6)||1440;
+    for(let t=Math.ceil(t0/(step*60000))*step*60000;t<t1-span*.1;t+=step*60000) if(t>t0+span*.1) ticks.push([x(t),t]);}
+  else{let last=0; order.forEach(k=>{const p=x(first[k]); if(p-last>=9&&p<=91){ticks.push([p,first[k]]); last=p}})}
+  const toggle=["readable","clock"].map(k=>`<button type="button" data-scale="${k}" aria-pressed="${scale===k}">${k==="readable"?"Readable":"To scale"}</button>`).join("");
+  return `<section class="panel"><h2 class="ph">The run on one clock<span class="sub hint">hover a bar for what it did, click to open it</span><span class="grow"></span><span class="seg">${toggle}</span></h2>
+    <div class="map"><div class="bands">${bands}</div><div class="lanes${scale==="clock"?" grid":""}" style="height:${lanes*H+6}px">${bars}${nowLine}</div>
+    <div class="ticks"><span style="left:0">${clock(new Date(t0).toISOString())}</span>${ticks.map(([p,t])=>`<span style="left:${p}%">${clock(new Date(t).toISOString())}</span>`).join("")}<span style="left:100%">${live(v)?"now":clock(new Date(t1).toISOString())}</span></div></div></section>`;
+}
+
+/* the rail */
+function stepMeta(s){
+  if(s.state==="running"||s.state==="waiting") return `<span class="mt" data-since="${esc(s.start)}">${secs(nowS()-ms(s.start)/1000)}</span>`;
+  const m=s.minutes!=null?s.minutes:(s.end&&s.start?(ms(s.end)-ms(s.start))/60000:null);
+  return `<span class="mt">${[m!=null?dur(m):"",s.usd?usd(s.usd):""].filter(Boolean).join(" · ")}</span>`;
+}
+function railHtml(v){
+  const st=v.steps||[], sel=selected(v), at=Math.floor(v.at), ended=!live(v)&&!v.halt;
+  const longest=Math.max(1,...st.map(s=>s.minutes||((s.end?ms(s.end):nowS()*1000)-ms(s.start))/60000||0));
+  const len=s=>{const m=s.minutes!=null?s.minutes:((s.end?ms(s.end):nowS()*1000)-ms(s.start))/60000; return Math.max(2,Math.sqrt(Math.max(0,m)/longest)*100)};
+  const groups=v.line.map((name,i)=>{
+    const mine=st.filter(s=>s.station===i);
+    const cls=v.at>=v.line.length||at>i?"done":at===i&&!ended?(v.halt?"now halt":"now"):"todo";
+    const mins=mine.reduce((a,s)=>a+(s.minutes||0),0);
+    const rows=mine.map((s,k)=>{const par=k>0&&(s.lane||0)>0&&mine.some(o=>o!==s&&ms(o.start)<=ms(s.start)&&(!o.end||ms(o.end)>ms(s.start)));
+      return `<button class="step r-${esc(s.role)} s-${esc(s.state)}${par?" par":""}" data-step="${esc(s.id)}" aria-pressed="${sel&&sel.id===s.id}">
+        <span class="dot"></span><span class="nm">${esc(s.name)}${attemptTag(s)}</span>${stepMeta(s)}
+        ${s.summary?`<span class="sm">${esc(short(s.summary,120))}</span>`:""}<span class="len"><i style="width:${len(s)}%"></i></span></button>`}).join("");
+    const empty=!mine.length?(cls==="done"?`<p class="gap">Nothing to do here this run</p>`:""):"";
+    return `<div class="stn ${cls}"><div class="stn-h"><b>${esc(name)}</b><span>${cls==="now"&&!mine.length?"next":mins?dur(mins):""}</span></div><div class="steps">${rows}${empty}</div></div>`;
+  }).join("");
+  return `<div class="rail"><div class="rail-h"><b>Timeline</b><span>${st.length} step${st.length===1?"":"s"}</span></div>${groups}</div>`;
+}
+
+/* hover card */
+function popHtml(s){
+  if(!s) return "";
+  const m=s.minutes!=null?s.minutes:(s.end?(ms(s.end)-ms(s.start))/60000:null);
+  const when=s.end&&s.end!==s.start?`${clock(s.start)} to ${clock(s.end)}`:clock(s.start);
+  const facts=[when,s.state==="running"?`working ${secs(nowS()-ms(s.start)/1000)}`:m!=null&&s.end!==s.start?dur(m):"",s.model||"",s.usd?usd(s.usd):"",s.tokens?toks(s.tokens):""].filter(Boolean);
+  const d=s.detail||{}; let more="";
+  if(d.findings&&d.findings.length) more=`<ul>${d.findings.slice(0,4).map(f=>`<li><b>${esc(f.id)}</b> ${esc(short(f.title,90))}${f.status==="fixed"?` (fixed${f.closed_by?" in "+roundOf(f.closed_by):""})`:f.status==="left open"?" (left open)":""}</li>`).join("")}</ul>${d.findings.length>4?`<p class="hint">and ${d.findings.length-4} more</p>`:""}`;
+  else if(d.fixes&&d.fixes.length) more=`<ul>${d.fixes.slice(0,3).map(f=>`<li><b>${esc(short(f.finding,40))}</b> ${esc(short(f.change,90))}</li>`).join("")}</ul>`;
+  else if(d.checks) more=d.red.length||d.blank.length?`<ul>${[...d.red.map(n=>"Red: "+n),...d.blank.map(n=>"Measured nothing: "+n)].slice(0,4).map(x=>`<li>${esc(short(x,90))}</li>`).join("")}</ul>`:"";
+  else if(d.items&&d.items.length&&s.role==="build") more=d.changelog?`<p style="margin-top:6px;color:var(--ink)">${esc(short(d.changelog,180))}</p>`:"";
+  else if(d.items&&d.items.length) more=`<ul>${d.items.slice(0,4).map(r=>`<li><b>${esc(r.item)}</b> ${esc((ITEM[r.state]||["",r.state])[1])}</li>`).join("")}</ul>`;
+  else if(s.kind==="pr"&&d.url) more=`<p>${esc(d.url)}</p>`;
+  const q=s.questions&&s.questions.length?`<p class="hint">Raised ${s.questions.length} question${s.questions.length===1?"":"s"} and kept going</p>`:"";
+  return `<h4>${esc(s.name)}${attemptTag(s)} ${tag(STEP,s.state)}</h4><div class="kv">${facts.map(f=>`<span>${esc(f)}</span>`).join("")}</div>
+    ${s.summary&&s.kind!=="pr"?`<p>${esc(short(s.summary,200))}</p>`:""}${more}${q}<p class="hint">Click to open it</p>`;
+}
+const pop=$("#pop");
+function showPop(el){
+  const s=V&&(V.steps||[]).find(x=>x.id===el.dataset.step); if(!s){hidePop();return}
+  popFor=el.dataset.step; pop.innerHTML=popHtml(s);
+  const r=el.getBoundingClientRect(), w=pop.offsetWidth, h=pop.offsetHeight, vw=innerWidth, vh=innerHeight;
+  let left, top;
+  if(el.classList.contains("bar")){left=Math.min(vw-w-12,Math.max(12,r.left+r.width/2-w/2)); top=r.bottom+10; if(top+h>vh-12) top=r.top-h-10}
+  else{left=r.right+12; top=Math.min(vh-h-12,Math.max(60,r.top-8)); if(left+w>vw-12){left=Math.max(12,r.left); top=r.bottom+8; if(top+h>vh-12) top=r.top-h-8}}
+  pop.style.left=left+"px"; pop.style.top=top+"px"; pop.classList.add("on");
+}
+function hidePop(){popFor=null; pop.classList.remove("on")}
+document.addEventListener("mouseover",e=>{const el=e.target.closest("[data-step]"); if(el&&!el.classList.contains("seat")) showPop(el); else if(popFor) hidePop()});
+document.addEventListener("focusin",e=>{const el=e.target.closest("[data-step]"); if(el&&!el.classList.contains("seat")) showPop(el); else hidePop()});
+// only the reader scrolling hides the card; a refresh that restores a list's scroll must not
+window.addEventListener("scroll",hidePop); document.addEventListener("wheel",hidePop,{passive:true});
+document.addEventListener("click",e=>{
+  const sc=e.target.closest("[data-scale]"); if(sc&&V){scale=sc.dataset.scale; try{localStorage.setItem("harness-scale",scale)}catch(err){} paint(V,true); return}
+  const go=e.target.closest("tr[data-go]"); if(go&&!e.target.closest("a")){location.hash="#run/"+go.dataset.go; return}
+  const el=e.target.closest("[data-step]"); if(!el||!V) return;
+  picked[V.id]=el.dataset.step; hidePop(); paint(V,true);
+  if(innerWidth<=860) document.querySelector(".detail")?.scrollIntoView({behavior:"smooth",block:"start"});
+});
+
+/* what a step did, in full */
+function seatLive(p){
+  const quiet=p.quiet_s>=600, c=p.commits;
+  const doing=p.doing&&p.doing.length?`<ul class="doing">${p.doing.map(d=>`<li><span class="when">${clock(d.at)}</span><span>${esc(d.text)}</span></li>`).join("")}</ul>`:`<p class="none">Nothing readable from its output yet.</p>`;
+  return `<div class="cols"><div><h3>Latest actions</h3>${doing}<p class="more">${quiet?`<span class="tag t-warn">quiet for ${secs(p.quiet_s)}</span>`:`Last wrote ${secs(p.quiet_s)} ago`}</p></div>
+    <div>${c?`<h3>${c.count?`${c.count} commit${c.count===1?"":"s"} so far`:"No commits yet"}</h3>${c.latest.length?list(c.latest):""}`:""}
+    ${p.in_progress&&p.in_progress.length?`<h3>In progress, from its notes</h3>${list(p.in_progress)}`:""}</div></div>`;
+}
+/* a finding reads its final state: fixed in a later round, left open by a fixer, or still open */
+const roundOf=id=>{const n=String(id).split("-").pop(); return `fix round ${n}`};
+function findingState(f){
+  if(f.status==="fixed") return `<span class="tag t-good">fixed${f.closed_by?" in "+esc(roundOf(f.closed_by)):""}</span>`;
+  if(f.status==="left open") return `<span class="tag t-warn">left open${f.closed_by?" by "+esc(roundOf(f.closed_by)):""}</span>`;
+  return `<span class="tag t-warn">${esc(f.status)}</span>`;
+}
+function panelFor(v,s){return (v.seats||[]).find(p=>`${p.seat}-${p.attempt}`===s.id)}
+function detailBody(v,s){
+  const d=s.detail||{};
+  if(s.state==="running"&&s.kind==="seat"){const p=panelFor(v,s); return p?seatLive(p):`<p class="none">Starting up.</p>`}
+  if(s.kind==="slice"){const sl=(v.slices||[]).find(x=>x.issue===d.issue)||{}, sub=(v.seats||[]).filter(p=>p.role.startsWith(`Slice ${d.issue},`));
+    return `<p class="lead">${esc(sl.title||s.name)}</p><dl class="list"><dt>Where it is</dt><dd>${esc(sl.where||s.summary||"")}</dd><dt>Items</dt><dd>${sl.total?worksWords(sl.works,sl.total,true):"not read yet"}</dd></dl>
+      ${sub.map(p=>`<h3>${esc(p.role)}</h3>${seatLive(p)}`).join("")}${sl.run_id?`<p style="margin-top:14px"><a class="btn" href="#run/${esc(sl.run_id)}">Open the slice's own page</a></p>`:""}`}
+  if(s.kind==="pr") return prBody(v,d);
+  if(s.kind==="stop") return `<p class="lead">${esc(d.text)}</p><p class="none">${s.state==="answered"?"Answered; the run started again.":"Answer it at the top of the page."}</p>`;
+  if(s.kind==="checks"){
+    const rows=d.checks||[]; if(!rows.length) return `<p class="none">${esc(s.summary||"Still running.")}</p>`;
+    const order={red:0,blank:1,pass:2};
+    return `<div class="counts">${d.red.length?`<span class="tag t-bad">${d.red.length} red</span>`:""}${d.blank.length?`<span class="tag t-warn">${d.blank.length} measured nothing</span>`:""}<span class="tag t-good">${rows.length-d.red.length-d.blank.length} passed</span></div>
+      <div class="tbl"><table><tr><th>Check</th><th>Took</th><th>Result</th></tr>${[...rows].sort((a,b)=>order[a.state]-order[b.state]).map(r=>`<tr><td>${esc(r.name)}</td><td class="n">${r.seconds==null?"":r.seconds<10?`${r.seconds.toFixed(1)}s`:secs(r.seconds)}</td><td class="n">${r.state==="pass"?`<span class="tag t-good">passed</span>`:r.state==="red"?((d.passed_later||{})[r.name]?`<span class="tag t-bad">red</span> <span class="tag t-good">passed in ${esc(d.passed_later[r.name])}</span>`:`<span class="tag t-bad">red</span>`):`<span class="tag t-warn">measured nothing</span>`}</td></tr>`).join("")}</table></div>`}
+  let out="";
+  if(s.state==="cut"||s.state==="failed") out+=`<p class="lead">${esc(s.summary)}</p>`;
+  if(s.role==="build"&&d.items){
+    const diff=d.items.filter(i=>i.status!=="built");
+    out+=(d.changelog?`<p class="lead">${esc(d.changelog)}</p>`:"")+(d.for_user&&d.for_user.length?`<h3>For the user</h3>${list(d.for_user)}`:"")
+      +`<h3>Items</h3><div class="tbl"><table><tr><th>Item</th><th>How</th><th>Why it differs</th></tr>${[...diff,...d.items.filter(i=>i.status==="built")].map(i=>`<tr><td class="mono">${esc(i.item)}</td><td class="n">${i.status==="built"?`<span class="tag t-good">built</span>`:`<span class="tag t-warn">${esc(i.status.replace(/-/g," "))}</span>`}</td><td>${esc(i.status==="built"?"":i.note)}</td></tr>`).join("")}</table></div>`
+      +(d.decisions&&d.decisions.length?`<h3>Decisions it made</h3>${list(d.decisions)}${d.decisions_total>d.decisions.length?`<p class="more">and ${d.decisions_total-d.decisions.length} more in its report</p>`:""}`:"")
+      +`<p class="more">${d.files} files touched, ${d.tests} tests pin the behaviour</p>`;
+  }
+  if(s.role==="review"&&d.findings){
+    out+=`<p class="lead">${d.goal_met===false?"The goal is not met yet.":d.goal_met?"The goal is met.":""} ${d.findings.length?`${d.findings.length} finding${d.findings.length===1?"":"s"}${d.scope==="hunk"?", reading only what changed since the last review":""}.`:"Nothing found."}</p>`
+      +(d.misses&&d.misses.length?`<h3>Why the goal is not met</h3>${list(d.misses)}`:"")
+      +(d.findings.length?`<div class="tbl"><table><tr><th></th><th>Finding</th><th>How serious</th><th>State</th></tr>${d.findings.map(f=>`<tr><td class="mono">${esc(f.id)}</td><td>${esc(f.title)}</td><td class="n">${f.severity==="P0"||f.severity==="P1"?`<span class="tag t-bad">${f.severity==="P0"?"blocking":"high"}</span>`:`<span class="tag t-quiet">${f.severity==="P2"?"medium":"low"}</span>`}</td><td class="n">${findingState(f)}</td></tr>`).join("")}</table></div>`:"")
+      +(d.codex&&d.codex.read?`<p class="more">It read the second reader's notes: kept ${d.codex.adopted||0}, set aside ${d.codex.refuted||0}.</p>`:"");
+  }
+  if(s.role==="codex"&&d.adopted!=null) out+=`<p class="lead">A second model read the whole change. The reviewer kept ${d.adopted} of its points and set ${d.refuted} aside.</p>${d.claims&&d.claims.length?`<div class="tbl"><table><tr><th>What it claimed</th><th>Verdict</th><th>Why</th></tr>${d.claims.map(k=>`<tr><td>${esc(k.claim)}</td><td class="n">${k.verdict==="adopted"?`<span class="tag t-bad">kept${k.finding?" as "+esc(k.finding):""}</span>`:`<span class="tag t-quiet">set aside</span>`}</td><td>${esc(k.reason)}</td></tr>`).join("")}</table></div>`:""}<p><button class="btn" type="button" data-step="${esc(d.reviewer)}">Open that review</button></p>`;
+  if(s.role==="fix"&&d.fixes) out+=(d.fixes.length?`<div class="tbl"><table><tr><th>What it answered</th><th>What it changed</th></tr>${d.fixes.map(f=>`<tr><td class="mono">${esc(f.finding)}</td><td>${esc(f.change)}</td></tr>`).join("")}</table></div>`:`<p class="none">No fixes recorded.</p>`)
+      +(d.left_open&&d.left_open.length?`<h3>Left open</h3>${list(d.left_open)}`:"");
+  if(s.role==="verify"&&d.items) out+=`<div class="tbl"><table><tr><th>Item</th><th>Result</th><th>What it saw</th></tr>${d.items.map(r=>`<tr><td class="mono">${esc(r.item)}</td><td class="n">${tag(ITEM,r.state)}</td><td>${esc(r.seen)}</td></tr>`).join("")}</table></div>`;
+  if(s.questions&&s.questions.length) out+=`<h3>Questions it raised and kept going</h3>${list(s.questions)}`;
+  return out||`<p class="none">${esc(s.summary||"Nothing more was recorded for this step.")}</p>`;
+}
+function prBody(v,d){
+  const f=v.first_screen;
+  let out=d.url?`<p style="margin-bottom:14px"><a class="btn" href="${esc(d.url)}">Open the PR</a></p>`:"";
+  if(!f) return out||`<p class="none">The PR did not open.</p>`;
+  const shots=v.shots.length?`<h3>Before and after</h3><div class="shots">${v.shots.map(s=>`<figure><img src="${esc(s.before)}" alt="Before, ${esc(s.item)}" loading="lazy" tabindex="0" data-zoom>Before, ${esc(s.item)}</figure>${s.after?`<figure><img src="${esc(s.after)}" alt="After, ${esc(s.item)}" loading="lazy" tabindex="0" data-zoom>After, ${esc(s.item)}</figure>`:""}`).join("")}</div>`:"";
+  return out+`<div class="cols"><div><h3>For the user</h3>${list(f.for_user)}</div><div><h3>Underneath</h3>${list(f.underneath)}</div></div>
+    <div class="cols"><div><h3>Needs your ruling</h3>${list(f.ruling)}</div><div><h3>Decided for you</h3>${list(f.decided,"Nothing was decided without you.")}</div></div>
+    ${f.size&&f.size.length?`<h3>Grew past the size limit</h3>${list(f.size)}`:""}
+    <div class="cols"><div><h3>Broken</h3>${list(f.broken)}</div><div><h3>Could not be tested</h3>${list(f.untested)}</div></div>
+    ${f.try&&f.try.length?`<h3>Try it</h3>${list(f.try)}`:""}${shots}`;
+}
+function detailHtml(v){
+  const s=selected(v);
+  if(!s) return panel(live(v)?"Getting ready":"No steps yet",`<p class="none">${live(v)?"The run is reading its contract and setting up its workspace.":"This run left no steps to show."}</p>`);
+  const m=s.minutes!=null?s.minutes:(s.end?(ms(s.end)-ms(s.start))/60000:null);
+  const facts=[`<span>${esc(v.line[s.station]||"")}</span>`,`<span>${s.end&&s.end!==s.start?`${clock(s.start)} to ${clock(s.end)}`:`from ${clock(s.start)}`}</span>`,
+    s.state==="running"||s.state==="waiting"?`<span>for <b data-since="${esc(s.start)}">${secs(nowS()-ms(s.start)/1000)}</b></span>`:m!=null&&s.end!==s.start?`<span><b>${dur(m)}</b></span>`:"",
+    s.model?`<span>${esc(s.model)}</span>`:"",s.usd?`<span><b>${usd(s.usd)}</b> of allowance</span>`:"",s.tokens?`<span>${toks(s.tokens)}</span>`:""].filter(Boolean).join("");
+  const isCur=current(v)&&current(v).id===s.id, follow=picked[v.id]&&!isCur&&current(v);
+  return `<section class="panel detail"><div class="detail-h">${s.state==="running"?`<span class="livedot"></span>`:""}<h2>${esc(s.name)}</h2>${attemptTag(s)}${tag(STEP,s.state)}
+    <span class="spacer" style="flex:1"></span>${follow?`<button class="theme" type="button" data-step="${esc(current(v).id)}">${live(v)?"Back to what is happening now":"Back to the outcome"}</button>`:""}</div>
+    <div class="kv">${facts}</div>${detailBody(v,s)}</section>`;
+}
+
+function workingHtml(v){
+  const ps=v.seats||[]; if(ps.length<2) return "";
+  const sel=selected(v);
+  return `<section><h2 class="ph" style="padding-left:4px">Working now<span class="sub">${ps.length} at once</span></h2><div class="seats">${ps.map(p=>{const id=`${p.seat}-${p.attempt}`, top=(p.doing||[])[0];
+    return `<button class="seat${sel&&sel.id===id?" sel":""}" type="button" data-step="${esc(id)}"><span class="seat-h"><span class="livedot"></span><b>${esc(p.role)}</b><span data-base="${p.running_s}">${secs(p.running_s)}</span>${p.quiet_s>=600?`<span class="tag t-warn">quiet ${secs(p.quiet_s)}</span>`:""}</span>
+      <span class="none" style="font-size:13px">${esc(top?top.text:"Starting up")}</span></button>`}).join("")}</div></section>`;
+}
+
+function asksHtml(v){
+  return v.stops.map(s=>`<div class="ask" data-run="${esc(v.id)}" data-stop="${esc(s.id)}"><h2>${esc(s.text)}</h2>
+    <label for="a-${esc(v.id)}-${esc(s.id)}" class="none">Your answer goes to the run word for word and is shown in the PR as your ruling.</label>
+    <textarea id="a-${esc(v.id)}-${esc(s.id)}" placeholder="Type your ruling"></textarea>
+    <div><button class="btn send" type="button">Send answer</button> <span class="none said"></span></div></div>`).join("");
+}
+
+function itemsHtml(v){
+  if(!v.items.length) return v.kind==="wave"?slicesHtml(v):"";
+  const groups=[["Broken",r=>r.state==="BROKEN"||r.state==="DIVERGED"],["Not measured",r=>r.state==="UNMEASURED"],["Waiting",r=>!r.state],["Works",r=>r.state==="WORKS"]];
+  const counts=groups.map(([n,f])=>[n,v.items.filter(f).length]).filter(([,c])=>c);
+  const cls={Broken:"t-bad","Not measured":"t-warn",Waiting:"t-quiet",Works:"t-good"};
+  const body=groups.map(([name,f])=>{const rows=v.items.filter(f); if(!rows.length) return "";
+    return `<p class="grp">${name}</p>${rows.map(r=>`<div class="it"><span class="mono">${esc(r.item)}</span><span>${tag(ITEM,r.state)}</span><p>${esc(short(r.text,140))}</p>
+      <small>Proved by ${esc(r.proof==="eyes"?"a tester looking":r.proof==="model"?"a tester with the product's model":"a test")}${r.substate==="by-test"?", a test passed":""}${r.pass_k?`, ${esc(r.pass_k)}`:""}</small></div>`).join("")}`}).join("");
+  return `<section class="panel items"><h2 class="ph">Items<span class="sub">${worksWords(v.works,v.total,untested(v))}</span></h2><div class="counts">${counts.map(([n,c])=>`<span class="tag ${cls[n]}">${c} ${n.toLowerCase()}</span>`).join("")}</div>${body}</section>`+(v.kind==="wave"?slicesHtml(v):"");
+}
+function slicesHtml(v){
+  if(!v.slices||!v.slices.length) return "";
+  return panel("Slices",v.slices.map(s=>`<div class="it"><span>${s.run_id?`<a href="#run/${esc(s.run_id)}">#${esc(s.issue)} ${esc(short(s.title,60))}</a>`:"#"+esc(s.issue)}</span>
+    <span>${s.parked?`<span class="tag t-warn">left out</span>`:s.merged?`<span class="tag t-good">merged</span>`:s.needs?`<span class="tag t-warn">waiting on you</span>`:`<span class="tag t-run">${esc(s.where||"working")}</span>`}</span>
+    ${s.total?`<small>${worksWords(s.works,s.total,true)}</small>`:""}</div>`).join(""),`${v.slices.length}`);
+}
+function feedHtml(v){
+  const rows=v.activity||[]; if(!rows.length) return "";
+  return panel("Activity",`<ul class="feed">${rows.map(r=>`<li><span class="when">${clock(r.at)}</span><span>${esc(r.text)}</span></li>`).join("")}</ul>`,"newest first");
+}
+function costHtml(v){const c=v.cost;
+  return panel("Time and cost",`<dl class="list"><dt>Start to ${live(v)?"now":"finish"}</dt><dd>${dur(c.wall_min)}</dd><dt>Agent work</dt><dd>${dur(c.agent_min)} across ${c.steps} steps</dd>
+    <dt>Allowance</dt><dd>about $${Math.round(c.list_usd)} at list price, nothing billed beyond the subscription</dd>
+    ${c.restarts?`<dt>Restarts</dt><dd>${c.restarts}, kept ${c.kept} finished steps</dd>`:""}
+    ${v.second_reader?`<dt>Second reader</dt><dd>${esc(v.second_reader)}</dd>`:""}</dl>`);
+}
+function launchHtml(v){
+  const c=v.launch; if(!c) return "";
+  const p=c.proofs||{}, proofs=["eyes","model","test"].filter(k=>p[k]).map(k=>`${p[k]} by ${k==="eyes"?"looking":k==="model"?"the product's model":"test"}`).join(", ");
+  return panel("How it is being run",`<dl class="list">${c.slices?`<dt>Slices</dt><dd>${c.slices.length} at once</dd>`:`<dt>Items</dt><dd>${c.items}${proofs?": "+proofs:""}</dd>`}
+    <dt>Stand-in</dt><dd>${c.stand_in?"Yes, a screen or the product's model is involved":"No, tests and review are the proof"}</dd>
+    <dt>Second reader</dt><dd>${c.second_reader?"Codex, once on the whole change":"None on this kind of run"}</dd>
+    <dt>Waits for you on</dt><dd>${(c.stop_kinds||[]).join(", ")||"the stop kinds in the config"}, anything against a ruling</dd></dl>`);
+}
+function filmHtml(v){const f=v.demo; if(!f) return "";
+  if(!f.video) return panel("The film",`<p class="none">${f.verdict==="waiting-for-deploy"?"Waiting for the merge to deploy, then the demo seat films it.":`No film: ${esc(f.why||f.verdict||"the demo seat made none")}.`}</p>`);
+  return panel("The film",`<div class="film"><video controls preload="metadata" src="${esc(f.video)}"></video>
+    ${f.summary?`<div class="text">${esc(f.summary)}</div>`:""}${f.chapters?`<details><summary>Chapters</summary><div class="text">${esc(f.chapters)}</div></details>`:""}</div>`);
+}
+function decidedHtml(v){return live(v)&&v.decided.length?panel("Decided for you so far",list(v.decided)):""}
+function closeoutHtml(v){const c=v.closeout; if(!c) return "";
+  const rows=(c.cleaned||[]).map(x=>`<tr><td>${esc(short(x.what,110))}</td><td class="n">${x.ok?`<span class="tag t-good">${esc(x.state||"gone")}</span>`:`<span class="tag t-bad">${esc(x.state||"left behind")}</span>`}</td></tr>`).join("");
+  return panel("Shipped",`<dl class="list"><dt>Merged</dt><dd>${esc(localTimes(c.merged||""))}</dd><dt>Live on</dt><dd>${esc(c.live||"not checked")}</dd><dt>Paid GitHub runners</dt><dd>${(c.paid_runners||{}).unread?"not read: "+esc(c.paid_runners.unread):((c.paid_runners||{}).jobs||[]).length?`<span class="tag t-bad">${c.paid_runners.jobs.length} job${c.paid_runners.jobs.length===1?"":"s"} billed</span> ${esc(c.paid_runners.jobs.join(", "))}`:"none, every job ran on your own machines"}</dd></dl>
+    ${rows?`<h3>Cleaned up</h3><table>${rows}</table>`:""}${(c.reds_carried||[]).length?`<h3>Red rows the merge carried</h3>${list(c.reds_carried)}<p class="more">No issue was filed; the session that read the PR decides what is owed.</p>`:""}`);
+}
+
+/* paint: each region is redrawn only when what it shows changed, so hover, selection and scroll stay put */
+const REGIONS={head:headHtml,asks:asksHtml,working:workingHtml,detail:detailHtml,film:filmHtml,map:mapHtml,rail:railHtml,items:itemsHtml,closeout:closeoutHtml,decided:decidedHtml,feed:feedHtml,launch:launchHtml,cost:costHtml};
+let shownRun="", shownHtml={};
+function shell(){
+  return `<div class="run"><header class="r-head" data-r="head"></header><aside class="r-rail" data-r="rail"></aside>
+    <div class="r-main"><div data-r="asks"></div><div data-r="map"></div><div data-r="working"></div><div data-r="detail"></div><div data-r="film"></div></div>
+    <div class="r-side"><div data-r="closeout"></div><div data-r="items"></div><div data-r="decided"></div><div data-r="feed"></div><div data-r="launch"></div><div data-r="cost"></div></div></div>`;
+}
+function paint(v,force){
+  if(shownRun!==v.id){shownRun=v.id; shownHtml={}; main.innerHTML=shell(); window.scrollTo(0,0)}
+  const typing=document.activeElement&&document.activeElement.tagName==="TEXTAREA"||[...document.querySelectorAll("textarea")].some(t=>t.value);
+  for(const [k,fn] of Object.entries(REGIONS)){
+    if(k==="asks"&&typing&&!force) continue;
+    const html=fn(v); if(shownHtml[k]===html) continue;
+    const box=main.querySelector(`[data-r="${k}"]`); if(!box) continue;
+    const scrollers=[...box.querySelectorAll(".feed")].map(e=>e.scrollTop), railTop=k==="rail"?box.scrollTop:0;
+    box.innerHTML=html; shownHtml[k]=html;
+    box.querySelectorAll(".feed").forEach((e,i)=>{e.scrollTop=scrollers[i]||0}); if(k==="rail") box.scrollTop=railTop;
+  }
+  if(popFor){const el=document.querySelector(`[data-step="${CSS.escape(popFor)}"]:hover`); if(el) showPop(el); else hidePop()}
+  const crumb=$("#crumb"); crumb.hidden=false; crumb.textContent=short(v.title,80);
+}
+
+const main=$("#main");
+/* the home: the server pushes it whole on `home` and one run's card on `run`; each region is
+   redrawn only when what it shows changed, and never under a half-typed answer */
+let H=null, shownHome={}, homeAt="";
+const PLACES={queue:queuePage,venues:venuesPage,docket:docketPage};
+function place(){const k=location.hash.replace(/^#/,"").split("/")[0]; return PLACES[k]||k==="runs"?k:"home"}
+function markPlace(k){document.querySelectorAll("#places a").forEach(a=>a.classList.toggle("on",a.dataset.place===k))}
+const typing=()=>[...document.querySelectorAll("textarea")].some(x=>x.value||x===document.activeElement);
+function paintHome(force){
+  if(!H) return;
+  const k=place(); V=null; shownRun=""; $("#crumb").hidden=true; markPlace(k); REPO=H.repo||REPO;
+  if(PLACES[k]){homeAt=""; const html=PLACES[k](H); if(html!==shownHome.place){main.innerHTML=html; shownHome={place:html}} return}
+  if(homeAt!==k){main.innerHTML=homeShell(); homeAt=k; shownHome={}}
+  const onTab=document.activeElement&&document.activeElement.matches(".tab");
+  for(const [r,fn] of Object.entries(HOME_REGIONS)){
+    if(r==="wait"&&typing()&&!force) continue;
+    const html=fn(H); if(shownHome[r]===html) continue;
+    const box=main.querySelector(`[data-h="${r}"]`), tops=[...box.querySelectorAll(".feed")].map(e=>e.scrollTop);
+    box.innerHTML=html; shownHome[r]=html; box.querySelectorAll(".feed").forEach((e,i)=>{e.scrollTop=tops[i]||0});
+  }
+  if(onTab&&!document.activeElement.matches(".tab")) main.querySelector('.tab[aria-selected="true"]')?.focus();
+}
+function paintMeters(){const html=metersHtml(H), m=$("#meters"); if(m.innerHTML!==html) m.innerHTML=html}
+const runHash=()=>{const m=location.hash.match(/^#run\/(.+)$/); return m?decodeURIComponent(m[1]):null};
+/* the run page reads only its own run, when the server says it moved */
+async function paintRun(id,force){
+  const v=await api("/api/run/"+encodeURIComponent(id));
+  if(!v.id){location.hash=""; return}
+  serverNow=v.now||Date.now()/1000; readAt=Date.now(); homeAt=""; shownHome={}; V=v; markPlace("runs"); paint(v,force);
+}
+let runTimer=null;
+function runMoved(id){if(runHash()!==id||runTimer) return; runTimer=setTimeout(()=>{runTimer=null; paintRun(id).catch(lost)},800)}
+function lost(e){const f=$("#fresh"); f.classList.add("off"); f.querySelector("span").textContent="Cannot reach Mermaid";
+  if(!V&&!H){main.innerHTML=`<div class="verdict v-bad"><b>Cannot reach Mermaid</b><span>Is the page server still running? ${esc(e.message)}</span></div>`}}
+async function render(force){
+  try{
+    const id=runHash();
+    if(id) await paintRun(id,force);
+    else{if(!H||force==="fetch"){H=await api("/api/dashboard"); serverNow=H.now; readAt=Date.now(); paintMeters()} paintHome(force)}
+    okAt=Date.now(); tick();
+  }catch(e){lost(e)}
+}
+/* one stream from the server; while it is down the page reads again every 30 s */
+let es=null;
+function listen(){
+  es=new EventSource("/api/events");
+  es.addEventListener("home",e=>{H=JSON.parse(e.data); serverNow=H.now; readAt=Date.now(); okAt=Date.now(); paintMeters(); if(!runHash()) paintHome()});
+  es.addEventListener("run",e=>{const d=JSON.parse(e.data); okAt=Date.now();
+    if(runHash()) return runMoved(d.id);
+    if(H&&d.card){const i=(H.live||[]).findIndex(v=>v.id===d.id); if(i>=0){H.live[i]=d.card; paintHome()}}});
+}
+listen();
+setInterval(()=>{if(!es||es.readyState===2){listen(); render("fetch")} else if(es.readyState!==1) render("fetch")},30000);
+main.addEventListener("click",async e=>{
+  const t=e.target.closest(".tab"); if(t){selTab=t.dataset.tab; paintHome(); main.querySelector(`[data-tab="${CSS.escape(selTab)}"]`)?.focus(); return}
+  if(!e.target.matches(".send")) return;
+  const box=e.target.closest(".ask"), text=box.querySelector("textarea").value.trim(), said=box.querySelector(".said");
+  if(!text){said.textContent="Type an answer first.";return}
+  e.target.disabled=true; said.textContent="Sending…";
+  const r=await api(`/api/run/${encodeURIComponent(box.dataset.run)}/answer`,{id:box.dataset.stop,text});
+  if(r.ok){box.querySelector("textarea").value=""; said.textContent=r.resumed?"Sent. The run is starting again.":"Sent. "+(r.why||""); setTimeout(()=>render(true),2500)}
+  else{said.textContent="Not sent: "+(r.why||"unknown"); e.target.disabled=false}
+});
+/* a picture opened full size; arrows walk every zoomable picture on the page */
+const zoom=$("#zoom"); let zoomAt=-1, zoomFrom=null;
+function zoomList(){return [...document.querySelectorAll("img[data-zoom]")]}
+function openZoom(i){const l=zoomList(); if(!l.length) return; zoomAt=(i+l.length)%l.length; const im=l[zoomAt];
+  zoom.querySelector("img").src=im.src; zoom.querySelector("img").alt=im.alt; zoom.querySelector(".cap").textContent=im.alt;
+  zoom.querySelector(".n").textContent=l.length>1?`${zoomAt+1} of ${l.length}, arrows to move`:""; zoom.classList.remove("actual"); zoom.querySelector('[data-z="actual"]').textContent="Actual size"; zoom.hidden=false; zoom.querySelector('[data-z="close"]').focus()}
+function closeZoom(){zoom.hidden=true; zoomAt=-1; zoomFrom&&zoomFrom.focus&&zoomFrom.focus(); zoomFrom=null}
+document.addEventListener("click",e=>{const im=e.target.closest("img[data-zoom]"); if(im){zoomFrom=im; openZoom(zoomList().indexOf(im)); e.stopPropagation()}},true);
+zoom.addEventListener("click",e=>{const b=e.target.closest("[data-z]");
+  const sizeBtn=zoom.querySelector('[data-z="actual"]');
+  // the picture itself toggles fit and actual size; the dark around it closes
+  if((b&&b.dataset.z==="actual")||e.target.tagName==="IMG"){zoom.classList.toggle("actual"); sizeBtn.textContent=zoom.classList.contains("actual")?"Fit to screen":"Actual size"; return}
+  closeZoom()});
+document.addEventListener("keydown",e=>{
+  if(zoom.hidden){const im=e.target.closest&&e.target.closest("img[data-zoom]"); if(im&&(e.key==="Enter"||e.key===" ")){zoomFrom=im; openZoom(zoomList().indexOf(im)); e.preventDefault()} return}
+  if(e.key==="Escape") closeZoom(); else if(e.key==="ArrowRight") openZoom(zoomAt+1); else if(e.key==="ArrowLeft") openZoom(zoomAt-1); else return;
+  e.preventDefault(); e.stopImmediatePropagation()},true);
+/* left and right move between the running runs */
+document.addEventListener("keydown",e=>{
+  if(runHash()||!H||!["ArrowLeft","ArrowRight"].includes(e.key)||e.target.closest("textarea,input")) return;
+  const r=running(H); if(r.length<2) return;
+  const i=Math.max(0,r.findIndex(v=>v.id===(tabRun(H)||{}).id)), n=(i+(e.key==="ArrowRight"?1:-1)+r.length)%r.length;
+  selTab=r[n].id; paintHome(); main.querySelector(`[data-tab="${CSS.escape(selTab)}"]`)?.focus(); e.preventDefault();
+});
+window.addEventListener("hashchange",()=>{hidePop(); render(true)});
+render("fetch");
+</script>
+</body>
+</html>

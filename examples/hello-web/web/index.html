@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>hello-web</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 48px 24px; max-width: 640px; color: #1a1a1a; }
+    h1 { font-size: 2rem; margin: 0 0 8px; overflow-wrap: anywhere; }
+    .empty { color: #777; font-style: italic; }
+    p { margin: 0; color: #555; }
+  </style>
+</head>
+<body>
+  <h1 id="greeting">Loading</h1>
+  <p>One page, one API. The heading is what <code>/api/greeting</code> answers.</p>
+  <script>
+    fetch("/api/greeting").then(r => r.json()).then(d => {
+      const h = document.getElementById("greeting");
+      if (!d.greeting) { h.textContent = "Nothing to say yet"; h.className = "empty"; }
+      else { h.textContent = d.greeting; }
+    }).catch(() => { document.getElementById("greeting").textContent = "The API did not answer"; });
+  </script>
+</body>
+</html>

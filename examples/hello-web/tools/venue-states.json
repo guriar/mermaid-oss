@@ -1,0 +1,17 @@
+{
+  "schema": "venue-states/v1",
+  "states": [
+    {"id": "greeting-default", "says": "the API answers the default greeting",
+     "steps": ["python tools/venue.py state build greeting-default --name <venue>"],
+     "undo": ["python tools/venue.py state undo greeting-default --name <venue>"],
+     "check": "python tools/venue.py state check greeting-default --name <venue>"},
+    {"id": "greeting-empty", "says": "the API answers an empty greeting and the page shows its empty face",
+     "steps": ["python tools/venue.py state build greeting-empty --name <venue>"],
+     "undo": ["python tools/venue.py state undo greeting-empty --name <venue>"],
+     "check": "python tools/venue.py state check greeting-empty --name <venue>"},
+    {"id": "greeting-long", "says": "the API answers a greeting too long for one line and the page wraps it",
+     "steps": ["python tools/venue.py state build greeting-long --name <venue>"],
+     "undo": ["python tools/venue.py state undo greeting-long --name <venue>"],
+     "check": "python tools/venue.py state check greeting-long --name <venue>"}
+  ]
+}

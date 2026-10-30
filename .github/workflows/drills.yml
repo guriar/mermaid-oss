@@ -1,0 +1,54 @@
+name: drills
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  structure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: the seven foundations and the arrow
+        run: python engine/hb.py rig structure
+      - name: no product word in the engine
+        run: python engine/hb.py rig words
+  drills:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # beats and runner run one job per drill: two of theirs starve a hosted runner to death near
+        # the 46 minute mark, and a dead runner keeps no log, so the job name is the only witness
+        foundation: [contract, venue, gates, record, rig,
+                     beats/branch_gc.py, beats/discovery.py, beats/drive.py, beats/here.py, beats/hotfix.py, beats/loop.py,
+                     beats/slice.py, runner/review.py, runner/run.py]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: every drill of the foundation, one TRUE_EXIT line each
+        env:
+          HB_DRILL_WORKERS: "2"
+          HB_DRILL_OUT: drill-out
+        run: |
+          set -o pipefail
+          name=$(echo "${{ matrix.foundation }}" | tr "/" "-")
+          ( while sleep 120; do echo "host $(date -u +%H:%M:%S) $(free -m | awk 'NR==2{print $3"/"$2" MB"}') $(df -h / | awk 'NR==2{print $4" free"}') procs=$(ps -e --no-headers | wc -l)"; done ) &
+          python engine/hb.py rig drill --here --only ${{ matrix.foundation }} | tee "drills-$name.json"
+      - name: keep the lines
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drills-${{ strategy.job-index }}
+          path: |
+            drills-*.json
+            drill-out/
