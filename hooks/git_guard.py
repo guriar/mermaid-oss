@@ -175,11 +175,11 @@ def _promotion_armed():
     return None
 
 
-def _gh_pr_base(selector, cwd):
+def _gh_pr_base(selector, cwd, repo=None):
     """Resolve a PR's base branch via gh. None on any failure (fail-open:
     a gh outage must not brick the wave's routine dev-based merges)."""
     argv = ["gh", "pr", "view"] + ([selector] if selector else []) + \
-           ["--json", "baseRefName", "-q", ".baseRefName"]
+           (["--repo", repo] if repo else []) + ["--json", "baseRefName", "-q", ".baseRefName"]
     try:
         r = subprocess.run(argv, capture_output=True, text=True, timeout=20,
                            cwd=cwd or None)
@@ -195,14 +195,43 @@ _PROMO_MSG = ("git-guard: the PR lane to main is owner-only (promotion wall). "
               "explicit confirm. Nothing a wave or slice does may target main.")
 
 
+def _repo_slug(path):
+    """owner/name of the checkout's origin, lowercased, or None when unreadable."""
+    try:
+        r = subprocess.run(["git", "-C", _msys_to_win(path) or ".", "remote", "get-url", "origin"],
+                           capture_output=True, text=True, timeout=10)
+    except Exception:
+        return None
+    m = re.search(r"[:/]([^/:]+/[^/]+?)(?:\.git)?/?$", r.stdout.strip()) if r.returncode == 0 else None
+    return m.group(1).lower() if m else None
+
+
+def _gh_named_repo(rest):
+    """The repo a gh call names with --repo/-R, or in an api path (repos/owner/name/...), else None."""
+    for j, t in enumerate(rest):
+        if t in ("--repo", "-R") and j + 1 < len(rest):
+            return rest[j + 1].lower()
+        if t.startswith("--repo="):
+            return t.split("=", 1)[1].lower()
+    m = re.search(r"\brepos/([^/\s]+/[^/\s]+)/", " ".join(rest))
+    return m.group(1).lower() if m else None
+
+
 def _check_gh(toks, cwd):
     """Promotion wall over gh: pr create/edit --base main, api pull-creation
-    with base=main, pr merge of a main-based PR."""
+    with base=main, pr merge of a main-based PR. Like the push wall, it guards THIS
+    project only: a gh call naming another repo, or run from a sibling checkout, passes."""
     if "gh" not in toks:
         return
     i = toks.index("gh")
     rest = toks[i + 1:]
     if not rest:
+        return
+    named = _gh_named_repo(rest)
+    mine = _repo_slug(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+    if named and mine and named != mine:
+        return  # a sibling repo: its main is not this project's promotion lane
+    if not named and not _is_this_repo(cwd):
         return
     joined = " ".join(rest)
 
@@ -223,14 +252,15 @@ def _check_gh(toks, cwd):
             _block(_PROMO_MSG)
     elif rest[0] == "pr" and len(rest) > 1 and rest[1] == "merge":
         positionals = [t for t in rest[2:] if not t.startswith("-")]
-        base = _gh_pr_base(positionals[0] if positionals else None, cwd)
+        positionals = [t for t in positionals if t.lower() != (named or "")]
+        base = _gh_pr_base(positionals[0] if positionals else None, cwd, named)
         if base in ("main", "master"):
             armed = _promotion_armed()
             if not armed:
                 _block(_PROMO_MSG)
     elif re.search(r"pulls/\d+/merge", joined):
         m = re.search(r"pulls/(\d+)/merge", joined)
-        base = _gh_pr_base(m.group(1), cwd)
+        base = _gh_pr_base(m.group(1), cwd, named)
         if base in ("main", "master") and not _promotion_armed():
             _block(_PROMO_MSG)
 

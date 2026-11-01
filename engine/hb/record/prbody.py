@@ -134,6 +134,20 @@ def headline(contract, note):
             or str(contract.get("goal") or "").strip())
 
 
+def _cell(text):
+    """Text whole in one table cell: a pipe or a line break would end the cell or the row."""
+    return str(text or "").replace("|", "\\|").replace("\r", " ").replace("\n", " ")
+
+
+def _proof(row, record_url):
+    """A step's proof: its receipt as the published record holds it, linked when the record is published,
+    else what the close said, whole."""
+    rel = row.get("receipt")
+    if rel and record_url and record_url.endswith("/record.md"):
+        return f"[{rel}]({record_url[:-len('record.md')]}{rel})"
+    return _cell(rel or row.get("observed"))
+
+
 def goals_met(goals, receipts):
     """(met, drivable, grey): a goal the anchor filed grey is not a miss; it is named."""
     by_item = {r.get("item"): r for r in receipts or []}
@@ -148,7 +162,8 @@ def render(contract, tip, run_id, gates, review, receipts, note, evidence, finis
            issues=None, size=None):
     """The PR body: the headline, the three finish states, the first screen with its row
     lists folded to counts, and a synopsis that links the record by commit. Bounded by
-    construction: no line here is written once per item, so no body is ever trimmed."""
+    construction: the only lines written once per item are a factory list's steps, a handful, so no
+    body is ever trimmed."""
     note = note or {}
     receipts = receipts or []
     counts = {s: sum(1 for r in receipts if r.get("state") == s) for s in ("WORKS", "BROKEN", "UNMEASURED", "DIVERGED")}
@@ -177,6 +192,12 @@ def render(contract, tip, run_id, gates, review, receipts, note, evidence, finis
     skipped = adapter.not_offered_lines()
     if skipped:
         lines += ["## Not offered by the venue", ""] + [f"- {x}" for x in skipped] + [""]
+    if contract.get("listed"):
+        by_item = {r.get("item"): r for r in receipts}
+        lines += ["## The list", "", "| step | words | state | proof |", "| --- | --- | --- | --- |"]
+        lines += [f"| {it['item']} | {_cell(it['text'])} | {by_item[it['item']].get('state')} | "
+                  f"{_proof(by_item[it['item']], record.get('url'))} |" for it in contract["items"]]
+        lines += [f"- dropped: {step}; {why}" for step, why in contract["dropped"].items()] + [""]
     lines += ["## Record", "",
               f"- {counts['WORKS']} WORKS, {counts['BROKEN']} BROKEN, {counts['UNMEASURED']} UNMEASURED, {counts['DIVERGED']} DIVERGED",
               f"- retired tests: {len(retired or [])}" + (f", {len(missing)} without a replacement shown failing: " + ", ".join(f"`{m}`" for m in missing) if missing else ""),

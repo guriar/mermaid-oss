@@ -13,11 +13,17 @@ record says so in those words.
 
 ## The steps
 
-1. **A worktree.** From the repo root: `python "${CLAUDE_PLUGIN_ROOT}/engine/hb.py" worktree open <slug>`.
-   The receipt names the worktree, its branch `here/<slug>` and the base sha. Work there, never in
-   the owner's checkout. A second open of the same slug returns the same worktree.
-2. **The work.** Read, experiment, change, commit as you go. This is the part the harness does not
-   script.
+1. **The list, then a worktree.** Write the list first: the owner's brief, or, for an ask of more
+   than one step, your own 3 to 7 numbered lines. From the repo root:
+   `python "${CLAUDE_PLUGIN_ROOT}/engine/hb.py" worktree open <slug> --brief <the list>`. A step is a
+   line that starts at the margin with `N.` or `N)`; nothing else counts. Read the receipt's `steps`,
+   `B1..Bn`, and fix the list if one is missing. A one-step ask opens with no list and is measured as
+   the single ask. The receipt names the worktree, its branch `here/<slug>`, the base sha, and the
+   list's copy in the worktree. Work there, never in the owner's checkout. A second open of the same
+   slug returns the same worktree and keeps the list copied at the first open.
+2. **The work.** Read, experiment, change, commit as you go. Edit the worktree's list as you learn:
+   add a step, and for each opening step you remove or reword, write one line naming it by its
+   opening id, `dropped: B2; <why>`, for example `dropped: B2; reworded as step 4`.
 3. **Eyes, whenever you want them.** Inside the worktree:
    `python "${CLAUDE_PLUGIN_ROOT}/engine/hb.py" review --here "<the ask>"`. One reviewer seat reads
    the diff from the base to your tip against the ask and the repo's standards, and the receipt
@@ -31,14 +37,31 @@ record says so in those words.
 6. **The landing, when the owner says done.** `python "${CLAUDE_PLUGIN_ROOT}/engine/hb.py" land`.
    The record and the PR body come from the same lander the beats use, with the review's findings,
    the audit's rows and the gates at the tip, and the PR opens against the landing branch.
-   `--shadow` writes the record and no PR.
+   Close every step of the list's final version, `B<n>` by its position:
+   `land --item B<n> WORKS|BROKEN <receipt path>`, or `--item B<n> UNMEASURED "<why>; <who decides>"`.
+   The landing refuses a step with no state, a missing or empty receipt, a bare or one-sided
+   UNMEASURED, or an opening step gone with no `dropped:` line naming it; a BROKEN step with its
+   receipt lands. The PR body prints each step's state with its receipt path or disposition. `--shadow` writes the record and no PR,
+   with the open steps named.
+
+## While you work
+
+These two are yours to keep; the engine does not check them.
+
+- **Decide, never wait.** A question you could ask the owner, decide with your recommendation, write
+  it in the record as a session answer, and keep working; say it at the next report. A question that
+  truly blocks (a migration, a new dependency, a guarded path, a production deploy) goes in the record
+  and you move to the other steps while it waits.
+- **Helpers in the foreground.** A helper you start runs in the foreground, so its result returns to
+  you and not to the owner's thread.
 
 ## What to tell the owner
 
 - After step 1: the worktree path and the branch, once.
 - After a review: the findings in one line each, and what you changed for them.
-- After the landing: the PR, the record's finish state, and the line the record carries about the
-  contract: none was supplied and completeness was not measured. Say it in those words.
+- After the landing: the PR, the record's finish state, the list with each step's state and the
+  dropped steps with their reasons, and the line the record carries about the contract: the list was
+  supplied, or none was and completeness was not measured. Say it in those words.
 
 ## When the shape is known
 
