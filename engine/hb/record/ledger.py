@@ -96,6 +96,20 @@ def _viewport_widths(c):
 VENUE_DRIVEN_KINDS = ("screen", "form", "list", "chat-verb", "api")
 
 
+def resolve_evidence(paths, under):
+    """Each cited path as given, else under `under`: (the resolved paths, the missing ones named)."""
+    resolved, missing = [], []
+    for p in paths:
+        cand = Path(p)
+        if not cand.is_absolute() and not cand.exists():
+            cand = Path(under) / p
+        if cand.exists():
+            resolved.append(str(cand.resolve()))
+        else:
+            missing.append(f"{p} (also tried {Path(under) / p})")
+    return resolved, missing
+
+
 def _ledger_state_check(state, substate):
     if state not in _LEDGER_STATES:
         return (f"state {state!r} is not one of {_LEDGER_STATES}: no other state, "
@@ -180,16 +194,7 @@ def cmd_ledger(a):
         # that way BEFORE asking whether they exist. A dry run once wrote correct
         # relative paths and every receipt died on `evidence-missing`, because the
         # check resolved them against the caller's cwd instead.
-        _evdir = _receipts_path(c, issue).parent
-        _ev_resolved, missing = [], []
-        for _p in (a.evidence or []):
-            _cand = Path(_p)
-            if not _cand.is_absolute() and not _cand.exists():
-                _cand = _evdir / _p
-            if _cand.exists():
-                _ev_resolved.append(str(_cand.resolve()))
-            else:
-                missing.append(f"{_p} (also tried {_evdir / _p})")
+        _ev_resolved, missing = resolve_evidence(a.evidence or [], _receipts_path(c, issue).parent)
         if missing:
             out({"error": "ledger receipt: cited evidence path(s) do NOT exist on "
                           f"disk: {missing}. A cited-but-absent receipt is "

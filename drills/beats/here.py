@@ -2,7 +2,8 @@
 """Drill of the instruments as verbs (ruling 17): a session opens a worktree, works there, and asks
 for a review of its own diff against its own ask, with no contract. Pins: the worktree receipt and
 its idempotence (MO-44), the review receipt's honesty line and findings (MO-45), and that the
-verbs journal into one run per worktree (MO-49)."""
+verbs journal into one run per worktree (MO-49), and that the run's one list closes at the landing:
+every final step closed, none a bare UNMEASURED, every opening step gone saying why (H8)."""
 import sys
 from pathlib import Path
 
@@ -12,6 +13,7 @@ sys.path.insert(0, str(ROOT / "drills"))
 
 import json  # noqa: E402
 import os  # noqa: E402
+import re  # noqa: E402
 import shutil  # noqa: E402
 import subprocess  # noqa: E402
 import tempfile  # noqa: E402
@@ -121,10 +123,94 @@ def main():
     check("land: the record and the PR body are written by the beats' own lander",
           rc == 0 and record.startswith("# Record of run here-") and "## Record" in body, str(ld)[:300] + body[:200])
     check("land: the receipt counts the audit's WORKS row", (ld.get("receipts") or {}).get("WORKS") == 1, str(ld.get("receipts")))
+    rc_item, li = hb(wt, "land", "--shadow", "--item", "ASK", "WORKS", str(sp), env={"FAKE_SCRIPT": str(sp)})
+    check("land: --item on a run opened with no list is refused, never ignored",
+          rc_item == 2 and "opened with none" in str(li.get("why")), str(li)[:200])
     check("land: the receipt says no contract was supplied", ld.get("contract") == "no contract supplied; completeness not measured",
           ld.get("contract"))
     check("land: shadow pushed nothing and opened no PR", ld.get("shadow") is True and not ld.get("pr"), str(ld)[:200])
 
+    print("drill H8 - one list in the worktree: every final step closes, every opening step gone says why")
+    brief = tmp / "BRIEF.md"
+    brief.write_text("# The brief\n\nWhy, in prose.\n\n1. **Instrument** the grader.\n   1. an indented detail, not a step\n"
+                     "2. Move the shared fixtures.\n3) Retire the battery.\n", encoding="utf-8")
+    rc, b = hb(repo, "worktree", "open", "three-steps", "--brief", str(brief))
+    bwt = Path(b.get("worktree") or "")
+    steps = Path(b.get("list") or "")
+    check("open: the list is copied into the worktree, where the session edits it",
+          rc == 0 and steps.is_file() and steps.read_text(encoding="utf-8") == brief.read_text(encoding="utf-8")
+          and bwt in steps.parents, str(b)[:400])
+    check("open: the receipt prints the steps the parser found, the indented line left out",
+          b.get("steps") == ["B1: Instrument the grader.", "B2: Move the shared fixtures.", "B3: Retire the battery."], str(b)[:400])
+    rc, nb = hb(repo, "worktree", "open", "no-steps", "--brief", str(tmp / "fake-script.json"))
+    check("open: a list with no step is refused, naming the shape of one", rc == 2 and "`1. <the step>`" in str(nb.get("why")), str(nb)[:200])
+    (bwt / "docs" / "steps.md").write_text("instrumented\n", encoding="utf-8")
+    gb = ["git", "-C", str(bwt), "-c", "user.email=d@d", "-c", "user.name=d"]
+    subprocess.run(gb + ["add", "docs/steps.md"], capture_output=True)
+    subprocess.run(gb + ["commit", "-qm", "step one", "--", "docs/steps.md"], capture_output=True)
+    receipt = tmp / "suite.log"
+    receipt.write_text("TRUE_EXIT=0\n", encoding="utf-8")
+    empty = tmp / "empty.log"
+    empty.write_text("", encoding="utf-8")
+    land_env = {"FAKE_SCRIPT": str(sp), "HB_GH_STUB": str(ROOT / "drills" / "fixture" / "gh_stub.py")}
+    rc, ld = hb(bwt, "land", "--item", "B1", "WORKS", str(receipt), env=land_env)
+    check("land: refused while a step has no state, naming each one open",
+          rc == 2 and ld.get("verdict") == "refused" and ld.get("gaps") == ["step B2 has no state", "step B3 has no state"],
+          str(ld)[:300])
+    rc, ld = hb(bwt, "land", "--item", "B2", "UNMEASURED", "not done", env=land_env)
+    check("land: a bare UNMEASURED does not close a step", rc == 2 and "bare UNMEASURED" in str(ld.get("refused")), str(ld)[:300])
+    rc, ld = hb(bwt, "land", "--item", "B2", "UNMEASURED", "not done; ", env=land_env)
+    check("land: a disposition with one half empty does not close a step", rc == 2 and "B2" in str(ld.get("refused")), str(ld)[:300])
+    rc, ld = hb(bwt, "land", "--item", "B3", "BROKEN", str(tmp / "no-such.log"), env=land_env)
+    check("land: a BROKEN row with no receipt on disk does not close", rc == 2 and "B3" in str(ld.get("refused")), str(ld)[:300])
+    rc, ld = hb(bwt, "land", "--item", "B3", "WORKS", str(empty), env=land_env)
+    check("land: an empty receipt does not close a step", rc == 2 and "empty" in str(ld.get("refused")), str(ld)[:300])
+    rc, ld = hb(bwt, "land", "--shadow", "--item", "B2", "UNMEASURED", "the battery runner needs the owner's key; the owner decides",
+                env=land_env)
+    brun = repo / ".context" / "harness" / "runs" / (b.get("run_id") or "x") / "evidence"
+    brecord = (brun / "record.md").read_text(encoding="utf-8") if (brun / "record.md").exists() else ""
+    check("land --shadow: the record is written with the open step named, and B1's close was kept",
+          rc == 0 and ld.get("gaps") == ["step B3 has no state"] and "GAP: no state given" in brecord, str(ld)[:300] + brecord[:300])
+
+    print("drill H8b - the session edits the list as it learns: an added step closes, a dropped or reworded one says why")
+    steps.write_text("1. Instrument the grader.\n2. Move the shared fixtures.\n3. Write the lore.\n", encoding="utf-8")
+    rc, ld = hb(bwt, "land", env=land_env)
+    check("land: a step added mid-run must close, and an opening step gone with no `dropped:` line refuses",
+          rc == 2 and ld.get("gaps") == ["step B3 has no state", "opening step B3 gone with no `dropped:` line naming it: Retire the battery."],
+          str(ld)[:300])
+    rc, ld = hb(bwt, "land", "--item", "B3", "WORKS", str(receipt), env=land_env)
+    check("land: with the added step closed, the opening step gone with no reason still refuses",
+          rc == 2 and ld.get("gaps") == ["opening step B3 gone with no `dropped:` line naming it: Retire the battery."], str(ld)[:300])
+    # a long step and a long disposition, so a table that cuts them shows it
+    long_step = "Write the lore, " + "and say why each rule holds for a reader with no memory of this run, " * 2 + "end."
+    long_why = ("the battery runner needs the owner's key, which lives only on the owner's machine and never in "
+                "the repo; the owner decides")
+    steps.write_text(f"1. Instrument the grader.\n2. Move every shared fixture.\n3. {long_step}\n\n"
+                     "dropped: Retire the battery.; the battery moves to its own run, the owner rules it\n"
+                     "dropped: the step about fixtures; reworded\n", encoding="utf-8")
+    rc, ld = hb(bwt, "land", "--item", "B2", "UNMEASURED", long_why, "--item", "B3", "WORKS", str(receipt), env=land_env)
+    check("land: a reworded step with no `dropped:` line naming its opening id or words refuses",
+          rc == 2 and ld.get("gaps") == ["opening step B2 gone with no `dropped:` line naming it: Move the shared fixtures."], str(ld)[:300])
+    with steps.open("a", encoding="utf-8") as f:
+        f.write("dropped: B2; reworded as step 2\n")
+    rc, ld = hb(bwt, "land", env=land_env)
+    bbody = (brun / "pr-body.md").read_text(encoding="utf-8") if (brun / "pr-body.md").exists() else ""
+    check("land: every final step closed and each opening step gone named with why, it lands with nothing open",
+          rc == 0 and ld.get("gaps") == [] and ld.get("receipts") == {"WORKS": 2, "BROKEN": 0, "DIVERGED": 0, "UNMEASURED": 1},
+          str(ld)[:400])
+    check("land: the PR body prints the final list with each state and proof, and the dropped steps with their reasons",
+          "## The list" in bbody
+          and re.search(r"\| B1 \| Instrument the grader\. \| WORKS \| \[receipts/B1-suite\.log\]"
+                        r"\(https://github\.com/drill/drill/blob/[0-9a-f]{40}/evidence/here-three-steps/receipts/B1-suite\.log\) \|", bbody)
+          and f"| B2 | Move every shared fixture. | UNMEASURED | disposition: {long_why} |" in bbody
+          and f"| B3 | {long_step} | WORKS | [receipts/B3-suite.log](" in bbody
+          and "- dropped: Retire the battery.; the battery moves to its own run" in bbody
+          and "- dropped: B2; reworded as step 2" in bbody, bbody[:1200])
+    check("land: each receipt is copied into the record, so a reader of the PR can open it",
+          (brun / "receipts" / "B1-suite.log").read_text(encoding="utf-8") == "TRUE_EXIT=0\n"
+          and (brun / "receipts" / "B3-suite.log").is_file(), str(sorted(p.name for p in (brun / "receipts").glob("*"))))
+    check("land: the record says the list was supplied", ld.get("contract", "").startswith("the run's list was supplied"),
+          ld.get("contract"))
 
     print("drill H7 - the git guard owns here/: a landed here/ branch is the harness's litter to sweep")
     guard = ROOT / "hooks" / "git_guard.py"
